@@ -132,7 +132,7 @@ public class FWFile<T> where T : new()
         }
         internal void ReadFloat(string data, T record)
         {
-            if (!float.TryParse(data, out var f))
+            if (!float.TryParse(data, NumberStyles.Float, CultureInfo.InvariantCulture, out var f))
             {
                 throw new FWParseException($"Failed to parse value '{data}' to float field '{FieldInfo.Name}");
             }
