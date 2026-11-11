@@ -5,69 +5,6 @@ using System.Threading;
 using System.Runtime.CompilerServices;
 
 namespace fwfile;
-// 1. Specify where the attribute can be used
-[AttributeUsage(AttributeTargets.Field, AllowMultiple = false)]
-public class FWFieldAttribute : Attribute
-{
-
-    /// <summary>
-    /// 
-    /// </summary>
-    /// <param name="length"></param>
-    /// <param name="header"></param>
-    /// <param name="boolTrueValues">default "true", "1", "Y", "S"</param>
-    /// <param name="dateTimeFormat"></param>
-    public FWFieldAttribute(int length, string header = "", string? boolTrueValues = null, string dateTimeFormat = "", string dateFormat = "", string timeFormat = "")
-    {
-        Length = length;
-        Header = header;
-        boolTrueValues ??= "true,1,y,s";
-        BoolTrueValues = new(boolTrueValues.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries), StringComparer.InvariantCultureIgnoreCase);
-        DateTimeFormats = DefaultDateTimeFormat(dateTimeFormat);
-        DateFormats = DefaultDateFormat(dateFormat);
-        TimeFormats = DefaultTimeFormat(timeFormat);
-    }
-    /// <summary>
-    /// length of the field
-    /// </summary>
-    public int Length { get; private set; }
-    /// <summary>
-    /// Header in the first line of the file
-    /// </summary>
-    public string Header { get; internal set; }
-    // public string BoolTrueValues {get;internal set;} = boolTrueValues;
-    public readonly HashSet<string> BoolTrueValues;
-    public readonly string[] DateTimeFormats;
-    public readonly string[] DateFormats;
-    public readonly string[] TimeFormats;
-
-    private static string[] DefaultDateTimeFormat(string dateTimeFormat)
-    {
-        return DefaultFormat(dateTimeFormat, [ "yyyy-MM-dd",
-            "MM/dd/yyyy HH:mm",
-            "dd-MMM-yyyy"]);
-    }
-    private static string[] DefaultDateFormat(string dateFormat)
-    {
-        return DefaultFormat(dateFormat, ["yyyy-MM-dd", "dd/MM/yyyy"]);
-    }
-    private static string[] DefaultTimeFormat(string timeFormat)
-    {
-        return DefaultFormat(timeFormat, ["HH:mm:ss", "HHmmss"]);
-    }
-
-    private static string[] DefaultFormat(string format, string[] defaultFormats) =>
-        string.IsNullOrWhiteSpace(format) ? defaultFormats : [format];
-}
-
-
-
-public class FWParseException : Exception
-{
-    public FWParseException(string message) : base(message) { }
-    public FWParseException(string message, Exception innerException) : base(message, innerException) { }
-
-}
 
 public class FWFile<T> where T : new()
 {
