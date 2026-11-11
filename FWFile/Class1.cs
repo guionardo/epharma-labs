@@ -141,11 +141,26 @@ public class FWFile<T> where T : new()
 
         internal void ReadBool(string data, T record)
         {
-            if (!bool.TryParse(data, out var b))
+            if (Attribute.BoolTrueValues.Contains(data))
             {
-                b = Attribute.BoolTrueValues.Contains(data.ToLowerInvariant());
+                FieldInfo.SetValue(record, true);
+                return;
             }
-            FieldInfo.SetValue(record, b);
+            if (bool.TryParse(data, out var b))
+            {
+                FieldInfo.SetValue(record, b);
+                return;
+            }
+            if (data.Equals("false", StringComparison.InvariantCultureIgnoreCase)
+                || data.Equals("0", StringComparison.InvariantCultureIgnoreCase)
+                || data.Equals("n", StringComparison.InvariantCultureIgnoreCase)
+                || data.Equals("no", StringComparison.InvariantCultureIgnoreCase)
+                || data.Equals("f", StringComparison.InvariantCultureIgnoreCase))
+            {
+                FieldInfo.SetValue(record, false);
+                return;
+            }
+            throw new FWParseException($"Failed to parse value '{data}' to bool field '{FieldInfo.Name}'");
         }
         internal void ReadDecimal(string data, T record)
         {
