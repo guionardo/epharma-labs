@@ -1,0 +1,11 @@
+/home/guionardo/dev/fwfile/FWFile/bin/Debug/net10.0/fwfile.deps.json
+/home/guionardo/dev/fwfile/FWFile/bin/Debug/net10.0/fwfile.dll
+/home/guionardo/dev/fwfile/FWFile/bin/Debug/net10.0/fwfile.pdb
+/home/guionardo/dev/fwfile/FWFile/obj/Debug/net10.0/fwfile.GeneratedMSBuildEditorConfig.editorconfig
+/home/guionardo/dev/fwfile/FWFile/obj/Debug/net10.0/fwfile.AssemblyInfoInputs.cache
+/home/guionardo/dev/fwfile/FWFile/obj/Debug/net10.0/fwfile.AssemblyInfo.cs
+/home/guionardo/dev/fwfile/FWFile/obj/Debug/net10.0/fwfile.csproj.CoreCompileInputs.cache
+/home/guionardo/dev/fwfile/FWFile/obj/Debug/net10.0/fwfile.dll
+/home/guionardo/dev/fwfile/FWFile/obj/Debug/net10.0/refint/fwfile.dll
+/home/guionardo/dev/fwfile/FWFile/obj/Debug/net10.0/fwfile.pdb
+/home/guionardo/dev/fwfile/FWFile/obj/Debug/net10.0/ref/fwfile.dll
