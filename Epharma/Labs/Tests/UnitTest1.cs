@@ -47,10 +47,13 @@ public class UnitTest1(ITestOutputHelper output)
    2Benjamin Furlan          20.002014-02-14N2002-02-0223:22:21";
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes(rows));
 
+        var count = 0;
         foreach (var s in f.ParseStream(stream))
         {
             _output.WriteLine(s.ToString());
+            count++;
         }
+        Assert.Equal(2, count);
 
 
     }

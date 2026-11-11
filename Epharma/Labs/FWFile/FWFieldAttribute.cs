@@ -6,7 +6,7 @@ namespace Epharma.Labs.FWFile;
 [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = false)]
 public class FWFieldAttribute : Attribute
 {
-    public FWFieldAttribute(int length, string header = "", string? boolTrueValues = null, string dateTimeFormat = "", string dateFormat = "", string timeFormat = "", bool trim = true, char padChar = ' ', bool rightAlign = false, int order = 0, string culture = "", Type? converterType = null)
+    public FWFieldAttribute(int length, string header = "", string? boolTrueValues = null, string? boolFalseValues = null, string dateTimeFormat = "", string dateFormat = "", string timeFormat = "", bool trim = true, char padChar = ' ', bool rightAlign = false, int order = 0, string culture = "", Type? converterType = null, bool truncate = true)
     {
         Length = length;
         Header = header;
@@ -16,8 +16,15 @@ public class FWFieldAttribute : Attribute
         Order = order;
         Culture = culture;
         ConverterType = converterType;
+        Truncate = truncate;
         boolTrueValues ??= "true,1,y,s";
-        BoolTrueValues = new(boolTrueValues.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries), StringComparer.InvariantCultureIgnoreCase);
+        boolFalseValues ??= "false,0,n,no,f";
+        var trueTokens = boolTrueValues.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        var falseTokens = boolFalseValues.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        BoolTrueValues = new(trueTokens, StringComparer.InvariantCultureIgnoreCase);
+        BoolFalseValues = new(falseTokens, StringComparer.InvariantCultureIgnoreCase);
+        BoolTrueValueTokens = trueTokens;
+        BoolFalseValueTokens = falseTokens;
         DateTimeFormats = DefaultDateTimeFormat(dateTimeFormat);
         DateFormats = DefaultDateFormat(dateFormat);
         TimeFormats = DefaultTimeFormat(timeFormat);
@@ -28,6 +35,10 @@ public class FWFieldAttribute : Attribute
     public string Header { get; internal set; }
 
     public readonly HashSet<string> BoolTrueValues;
+    public readonly HashSet<string> BoolFalseValues;
+    public readonly string[] BoolTrueValueTokens;
+    public readonly string[] BoolFalseValueTokens;
+    public bool Truncate { get; private set; } = true;
 
     public readonly string[] DateTimeFormats;
 

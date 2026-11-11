@@ -20,7 +20,7 @@ foreach (var row in f.ParseStream(stream))
 
 ## Funcionalidades
 
-- Tipos suportados: `string`, `int`, `float`, `decimal`, `bool`, `DateTime`, `DateOnly`, `TimeOnly` e seus nullable.
+- Tipos suportados: `string`, `int`, `long`, `short`, `byte`, `float`, `double`, `decimal`, `bool`, `char`, `Guid`, `DateTime`, `DateTimeOffset`, `DateOnly`, `TimeOnly`, `TimeSpan`, enums e seus nullable.
 - Formatos customizáveis por campo (data/hora), valores booleanos, trim, alinhamento, padding.
 - Leitura síncrona (`ParseStream`) e assíncrona (`ParseStreamAsync`).
 - Escrita (`Write`/`WriteAsync`/`Format`).

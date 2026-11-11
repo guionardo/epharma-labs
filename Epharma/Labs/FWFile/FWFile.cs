@@ -27,6 +27,16 @@ public class FWFile<T> where T : new()
 
         internal Type NonNullableType => Nullable.GetUnderlyingType(FieldType) ?? FieldType;
 
+        internal string SelectBoolToken(bool value)
+        {
+            var tokens = value ? Attribute.BoolTrueValueTokens : Attribute.BoolFalseValueTokens;
+            foreach (var t in tokens)
+            {
+                if (t.Length <= Attribute.Length) return t;
+            }
+            return tokens.Length > 0 ? tokens[0] : (value ? "true" : "false");
+        }
+
         internal object? ResolveDefaultValue()
         {
             if (!Attribute.HasDefaultValue) throw new InvalidOperationException("No default value defined for this field.");
@@ -152,7 +162,7 @@ public class FWFile<T> where T : new()
             if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
             if (!int.TryParse(data, NumberStyles.Integer, Culture, out var i))
             {
-                throw new FWParseException($"Failed to parse value '{data}' to int field '{Member.Name}");
+                throw new FWParseException($"Failed to parse value '{data}' to int field '{Member.Name}'");
             }
             SetMemberValue(record, i);
         }
@@ -161,7 +171,7 @@ public class FWFile<T> where T : new()
             if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
             if (!float.TryParse(data, NumberStyles.Float, Culture, out var f))
             {
-                throw new FWParseException($"Failed to parse value '{data}' to float field '{Member.Name}");
+                throw new FWParseException($"Failed to parse value '{data}' to float field '{Member.Name}'");
             }
             SetMemberValue(record, f);
         }
@@ -180,11 +190,7 @@ public class FWFile<T> where T : new()
                 SetMemberValue(record, b);
                 return;
             }
-            if (s.Equals("false", StringComparison.InvariantCultureIgnoreCase)
-                || s == "0"
-                || s.Equals("n", StringComparison.InvariantCultureIgnoreCase)
-                || s.Equals("no", StringComparison.InvariantCultureIgnoreCase)
-                || s.Equals("f", StringComparison.InvariantCultureIgnoreCase))
+            if (Attribute.BoolFalseValues.Contains(s))
             {
                 SetMemberValue(record, false);
                 return;
@@ -194,7 +200,7 @@ public class FWFile<T> where T : new()
         internal void ReadDecimal(ReadOnlySpan<char> data, T record)
         {
             if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
-            if (!decimal.TryParse(data, NumberStyles.Number, Culture, out var d))
+            if (!decimal.TryParse(data, NumberStyles.Number & ~NumberStyles.AllowThousands, Culture, out var d))
             {
                 throw new FWParseException($"Failed to parse value '{data}' to Decimal field '{Member.Name}'");
             }
@@ -212,7 +218,7 @@ public class FWFile<T> where T : new()
                     return;
                 }
             }
-            throw new FWParseException($"Failed to parse value '{data}' to DateTime field '{Member.Name}");
+            throw new FWParseException($"Failed to parse value '{data}' to DateTime field '{Member.Name}'");
         }
         internal void ReadDate(ReadOnlySpan<char> data, T record)
         {
@@ -225,7 +231,7 @@ public class FWFile<T> where T : new()
                     return;
                 }
             }
-            throw new FWParseException($"Failed to parse value '{data}' to DateOnly field '{Member.Name}");
+            throw new FWParseException($"Failed to parse value '{data}' to DateOnly field '{Member.Name}'");
         }
         internal void ReadTime(ReadOnlySpan<char> data, T record)
         {
@@ -238,7 +244,7 @@ public class FWFile<T> where T : new()
                     return;
                 }
             }
-            throw new FWParseException($"Failed to parse value '{data}' to TimeOnly field '{Member.Name}");
+            throw new FWParseException($"Failed to parse value '{data}' to TimeOnly field '{Member.Name}'");
         }
 
         internal void ReadWithConverter(ReadOnlySpan<char> data, T record)
@@ -345,7 +351,7 @@ public class FWFile<T> where T : new()
                 columns.Add(new Column { Attribute = attribute, Member = member }.Validate());
             }
             columns = columns.OrderBy(c => c.Attribute.Order).ToList();
-            if (columns.Count == 0) throw new FWParseException($"There is no field defined for the type {nameof(T)}");
+            if (columns.Count == 0) throw new FWParseException($"There is no field defined for the type {typeof(T).Name}");
         }
         _validated = true;
     }
@@ -391,7 +397,7 @@ public class FWFile<T> where T : new()
         columns = columns.OrderBy(c => c.Attribute.Order).ToList();
         if (columns.Count == 0)
         {
-            throw new FWParseException($"There is no field defined with the {nameof(FWFieldAttribute)} attribute in the type {nameof(T)}");
+            throw new FWParseException($"There is no field defined with the {nameof(FWFieldAttribute)} attribute in the type {typeof(T).Name}");
         }
     }
 
@@ -456,7 +462,7 @@ public class FWFile<T> where T : new()
                 {
                     null => string.Empty,
                     string s => s,
-                    bool b => b ? "true" : "false",
+                    bool b => c.SelectBoolToken(b),
                     DateTime dt => dt.ToString(c.Attribute.DateTimeFormats[0], c.Culture),
                     DateOnly d => d.ToString(c.Attribute.DateFormats[0], c.Culture),
                     TimeOnly t => t.ToString(c.Attribute.TimeFormats[0], c.Culture),
@@ -464,7 +470,17 @@ public class FWFile<T> where T : new()
                     _ => value.ToString() ?? string.Empty,
                 };
             }
-            if (text.Length > c.Attribute.Length) text = text.Substring(0, c.Attribute.Length);
+            if (text.Length > c.Attribute.Length)
+            {
+                if (value is string && c.Attribute.Truncate)
+                {
+                    text = text.Substring(0, c.Attribute.Length);
+                }
+                else
+                {
+                    throw new FWParseException($"Value '{text}' does not fit in field '{c.Member.Name}' of length {c.Attribute.Length}");
+                }
+            }
             sb.Append(c.Attribute.RightAlign
                 ? text.PadLeft(c.Attribute.Length, c.Attribute.PadChar)
                 : text.PadRight(c.Attribute.Length, c.Attribute.PadChar));
@@ -520,7 +536,7 @@ public class FWFile<T> where T : new()
     public IEnumerable<T> ParseStream(Stream stream, Encoding? encoding = null, bool skipHeader = false, int maxRows = 0, bool lenient = false, bool autoSkipHeader = false, CancellationToken cancellationToken = default)
     {
         EnsureValidated();
-        using var reader = new StreamReader(stream, encoding ?? Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+        using var reader = new StreamReader(stream, encoding ?? Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
         var index = 0;
         if (skipHeader)
         {
@@ -561,7 +577,7 @@ public class FWFile<T> where T : new()
     public async IAsyncEnumerable<T> ParseStreamAsync(Stream stream, Encoding? encoding = null, bool skipHeader = false, int maxRows = 0, bool lenient = false, bool autoSkipHeader = false, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         EnsureValidated();
-        using var reader = new StreamReader(stream, encoding ?? Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+        using var reader = new StreamReader(stream, encoding ?? Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
         var index = 0;
         if (skipHeader)
         {
