@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text;
 using System.Threading;
 using System.Runtime.CompilerServices;
+using System.Linq.Expressions;
 
 namespace fwfile;
 
@@ -295,9 +296,58 @@ public class FWFile<T> where T : new()
     }
     private List<Column> columns = [];
     private int rowLength = 0;
+    private readonly List<(MemberInfo Member, FWFieldAttribute Attribute)> _definitions = new();
+    private bool _hasDefinitions;
+    private bool _validated;
+
     public FWFile()
     {
-        ValidateFields();
+    }
+
+    public FWFile(Action<FWFile<T>> configure)
+    {
+        configure(this);
+    }
+
+    private void EnsureValidated()
+    {
+        if (_validated) return;
+        if (!_hasDefinitions)
+        {
+            ValidateFields();
+        }
+        else
+        {
+            foreach (var (member, attribute) in _definitions)
+            {
+                if (string.IsNullOrWhiteSpace(attribute.Header))
+                {
+                    attribute.Header = member.Name;
+                }
+                rowLength += attribute.Length;
+                columns.Add(new Column { Attribute = attribute, Member = member }.Validate());
+            }
+            columns = columns.OrderBy(c => c.Attribute.Order).ToList();
+            if (columns.Count == 0) throw new FWParseException($"There is no field defined for the type {nameof(T)}");
+        }
+        _validated = true;
+    }
+
+    public FWFile<T> Field<TValue>(Expression<Func<T, TValue>> selector, int length, Action<FWFieldAttribute>? configure = null)
+    {
+        var member = GetMember(selector);
+        var attribute = new FWFieldAttribute(length);
+        configure?.Invoke(attribute);
+        _definitions.Add((member, attribute));
+        _hasDefinitions = true;
+        return this;
+    }
+
+    private static MemberInfo GetMember<TValue>(Expression<Func<T, TValue>> selector)
+    {
+        if (selector.Body is MemberExpression me) return me.Member;
+        if (selector.Body is UnaryExpression ue && ue.Operand is MemberExpression me2) return me2.Member;
+        throw new ArgumentException("Selector must be a member access", nameof(selector));
     }
 
     private void ValidateFields()
@@ -352,6 +402,7 @@ public class FWFile<T> where T : new()
 
     public string Format(T record)
     {
+        EnsureValidated();
         var sb = new StringBuilder(rowLength);
         foreach (var c in columns)
         {
@@ -385,6 +436,7 @@ public class FWFile<T> where T : new()
 
     public void Write(Stream stream, IEnumerable<T> records, Encoding? encoding = null, bool writeHeader = false)
     {
+        EnsureValidated();
         using var writer = new StreamWriter(stream, encoding ?? Encoding.UTF8, leaveOpen: true);
         if (writeHeader)
         {
@@ -406,6 +458,7 @@ public class FWFile<T> where T : new()
 
     public async Task WriteAsync(Stream stream, IEnumerable<T> records, Encoding? encoding = null, bool writeHeader = false, CancellationToken cancellationToken = default)
     {
+        EnsureValidated();
         await using var writer = new StreamWriter(stream, encoding ?? Encoding.UTF8, leaveOpen: true);
         if (writeHeader)
         {
@@ -428,6 +481,7 @@ public class FWFile<T> where T : new()
 
     public IEnumerable<T> ParseStream(Stream stream, Encoding? encoding = null, bool skipHeader = false, int maxRows = 0, bool lenient = false, CancellationToken cancellationToken = default)
     {
+        EnsureValidated();
         using var reader = new StreamReader(stream, encoding ?? Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
         var index = 0;
         if (skipHeader)
@@ -461,6 +515,7 @@ public class FWFile<T> where T : new()
 
     public async IAsyncEnumerable<T> ParseStreamAsync(Stream stream, Encoding? encoding = null, bool skipHeader = false, int maxRows = 0, bool lenient = false, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        EnsureValidated();
         using var reader = new StreamReader(stream, encoding ?? Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
         var index = 0;
         if (skipHeader)
