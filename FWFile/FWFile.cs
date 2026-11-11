@@ -393,6 +393,20 @@ public class FWFile<T> where T : new()
         return record;
     }
 
+    private bool IsHeaderLine(string row)
+    {
+        if (row.Length != rowLength) return false;
+        var index = 0;
+        foreach (var c in columns)
+        {
+            var field = row.AsSpan(index, c.Attribute.Length);
+            index += c.Attribute.Length;
+            var header = c.Attribute.Header ?? string.Empty;
+            if (!field.Trim().Equals(header.AsSpan(), StringComparison.OrdinalIgnoreCase)) return false;
+        }
+        return true;
+    }
+
     private string NormalizeRow(string row)
     {
         if (row.Length == rowLength) return row;
@@ -479,7 +493,7 @@ public class FWFile<T> where T : new()
         await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    public IEnumerable<T> ParseStream(Stream stream, Encoding? encoding = null, bool skipHeader = false, int maxRows = 0, bool lenient = false, CancellationToken cancellationToken = default)
+    public IEnumerable<T> ParseStream(Stream stream, Encoding? encoding = null, bool skipHeader = false, int maxRows = 0, bool lenient = false, bool autoSkipHeader = false, CancellationToken cancellationToken = default)
     {
         EnsureValidated();
         using var reader = new StreamReader(stream, encoding ?? Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
@@ -492,6 +506,7 @@ public class FWFile<T> where T : new()
         string? data;
         T e;
         var yielded = 0;
+        var firstLine = !skipHeader;
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -500,6 +515,12 @@ public class FWFile<T> where T : new()
             data = reader.ReadLine();
             if (data is null) break; // End of stream
             if (data.Length == 0) continue; // skip empty lines
+            if (firstLine && autoSkipHeader && IsHeaderLine(data))
+            {
+                firstLine = false;
+                continue;
+            }
+            firstLine = false;
             try
             {
                 e = ParseRow(lenient ? NormalizeRow(data) : data);
@@ -513,7 +534,7 @@ public class FWFile<T> where T : new()
         }
     }
 
-    public async IAsyncEnumerable<T> ParseStreamAsync(Stream stream, Encoding? encoding = null, bool skipHeader = false, int maxRows = 0, bool lenient = false, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<T> ParseStreamAsync(Stream stream, Encoding? encoding = null, bool skipHeader = false, int maxRows = 0, bool lenient = false, bool autoSkipHeader = false, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         EnsureValidated();
         using var reader = new StreamReader(stream, encoding ?? Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
@@ -525,6 +546,7 @@ public class FWFile<T> where T : new()
         }
         string? data;
         var yielded = 0;
+        var firstLine = !skipHeader;
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -533,6 +555,12 @@ public class FWFile<T> where T : new()
             data = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
             if (data is null) break;
             if (data.Length == 0) continue;
+            if (firstLine && autoSkipHeader && IsHeaderLine(data))
+            {
+                firstLine = false;
+                continue;
+            }
+            firstLine = false;
             T e;
             try
             {
