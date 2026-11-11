@@ -64,6 +64,12 @@ public class FWFieldAttribute : Attribute
 
     public Type? ConverterType { get; private set; }
 
+    /// <summary>Explicit start position (0-based). -1 means sequential (default).</summary>
+    public int Start { get; set; } = -1;
+
+    /// <summary>Number of decimal places for implicit decimal fields (e.g. 2 -> 12345 = 123.45).</summary>
+    public int Decimals { get; set; }
+
     private bool _hasDefaultValue;
     private object? _defaultValue;
     /// <summary>Valor usado quando a conversão do campo falhar.</summary>
@@ -76,12 +82,12 @@ public class FWFieldAttribute : Attribute
 
     private static string[] DefaultDateTimeFormat(string dateTimeFormat)
     {
-        return DefaultFormat(dateTimeFormat, [ "yyyy-MM-dd", "MM/dd/yyyy HH:mm", "dd-MMM-yyyy"]);
+        return DefaultFormat(dateTimeFormat, [ "yyyy-MM-dd", "dd/MM/yyyy", "yyyyMMdd", "ddMMyyyy"]);
     }
 
     private static string[] DefaultDateFormat(string dateFormat)
     {
-        return DefaultFormat(dateFormat, ["yyyy-MM-dd", "dd/MM/yyyy"]);
+        return DefaultFormat(dateFormat, ["yyyy-MM-dd", "dd/MM/yyyy", "yyyyMMdd", "ddMMyyyy"]);
     }
 
     private static string[] DefaultTimeFormat(string timeFormat)

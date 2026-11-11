@@ -202,6 +202,18 @@ public class FWFile<T> where T : new()
         internal void ReadDecimal(ReadOnlySpan<char> data, T record)
         {
             if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
+            if (Attribute.Decimals > 0)
+            {
+                var span = data.Trim();
+                if (span.IsEmpty) { if (IsNullable) { SetMemberValue(record, null); return; } }
+                if (!long.TryParse(span, NumberStyles.Integer, Culture, out var scaled))
+                {
+                    throw new FWParseException($"Failed to parse field '{Member.Name}' (position {Start}, length {Attribute.Length}) to Decimal");
+                }
+                var factor = (decimal)Math.Pow(10, Attribute.Decimals);
+                SetMemberValue(record, scaled / factor);
+                return;
+            }
             if (!decimal.TryParse(data, NumberStyles.Number & ~NumberStyles.AllowThousands, Culture, out var d))
             {
                 throw new FWParseException($"Failed to parse field '{Member.Name}' (position {Start}, length {Attribute.Length}) to Decimal");
@@ -211,6 +223,13 @@ public class FWFile<T> where T : new()
 
         internal void ReadDateTime(ReadOnlySpan<char> data, T record)
         {
+            var trimmed = data.Trim();
+            if (trimmed.IsEmpty || trimmed.Trim('0').IsEmpty)
+            {
+                if (IsNullable) { SetMemberValue(record, null); return; }
+                SetMemberValue(record, default(DateTime));
+                return;
+            }
             if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
             foreach (var template in Attribute.DateTimeFormats)
             {
@@ -224,6 +243,13 @@ public class FWFile<T> where T : new()
         }
         internal void ReadDate(ReadOnlySpan<char> data, T record)
         {
+            var trimmed = data.Trim();
+            if (trimmed.IsEmpty || trimmed.Trim('0').IsEmpty)
+            {
+                if (IsNullable) { SetMemberValue(record, null); return; }
+                SetMemberValue(record, default(DateOnly));
+                return;
+            }
             if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
             foreach (var template in Attribute.DateFormats)
             {
@@ -237,6 +263,13 @@ public class FWFile<T> where T : new()
         }
         internal void ReadTime(ReadOnlySpan<char> data, T record)
         {
+            var trimmed = data.Trim();
+            if (trimmed.IsEmpty || trimmed.Trim('0').IsEmpty)
+            {
+                if (IsNullable) { SetMemberValue(record, null); return; }
+                SetMemberValue(record, default(TimeOnly));
+                return;
+            }
             if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
             foreach (var template in Attribute.TimeFormats)
             {
@@ -326,6 +359,11 @@ public class FWFile<T> where T : new()
     private bool _validated;
     private Func<T, IEnumerable<FWValidationIssue>>? _validator;
 
+    static FWFile()
+    {
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+    }
+
     public FWFile()
     {
     }
@@ -350,14 +388,21 @@ public class FWFile<T> where T : new()
                 {
                     attribute.Header = member.Name;
                 }
-                rowLength += attribute.Length;
                 columns.Add(new Column { Attribute = attribute, Member = member }.Validate());
             }
             columns = columns.OrderBy(c => c.Attribute.Order).ToList();
             {
                 var pos = 0;
-                foreach (var c in columns) { c.Start = pos; pos += c.Attribute.Length; }
+                foreach (var c in columns)
+                {
+                    if (c.Attribute.Start >= 0) c.Start = c.Attribute.Start;
+                    else c.Start = pos;
+                    if (c.Start < pos) throw new FWParseException($"Field '{c.Member.Name}' overlaps previous field.");
+                    pos = c.Start + c.Attribute.Length;
+                }
+                rowLength = pos;
             }
+            ValidateNoOverlap(columns);
             if (columns.Count == 0) throw new FWParseException($"There is no field defined for the type {typeof(T).Name}");
         }
         _validated = true;
@@ -403,15 +448,22 @@ public class FWFile<T> where T : new()
             {
                 attribute.Header = member.Name;
             }
-            rowLength += attribute.Length;
 
             columns.Add(new Column { Attribute = attribute, Member = member }.Validate());
         }
         columns = columns.OrderBy(c => c.Attribute.Order).ToList();
         {
             var pos = 0;
-            foreach (var c in columns) { c.Start = pos; pos += c.Attribute.Length; }
+            foreach (var c in columns)
+            {
+                if (c.Attribute.Start >= 0) c.Start = c.Attribute.Start;
+                else c.Start = pos;
+                if (c.Start < pos) throw new FWParseException($"Field '{c.Member.Name}' overlaps previous field.");
+                pos = c.Start + c.Attribute.Length;
+            }
+            rowLength = pos;
         }
+        ValidateNoOverlap(columns);
         if (columns.Count == 0)
         {
             throw new FWParseException($"There is no field defined with the {nameof(FWFieldAttribute)} attribute in the type {typeof(T).Name}");
@@ -422,11 +474,9 @@ public class FWFile<T> where T : new()
     {
         if (row.Length != rowLength) throw new FWParseException($"expected row with length {rowLength} but found {row.Length}");
         T record = new();
-        var index = 0;
         foreach (var c in columns)
         {
-            var data = row.AsSpan(index, c.Attribute.Length);
-            index += c.Attribute.Length;
+            var data = row.AsSpan(c.Start, c.Attribute.Length);
             if (c.Attribute.Trim) data = data.Trim();
             try
             {
@@ -468,11 +518,9 @@ public class FWFile<T> where T : new()
             }
         }
         T record = new();
-        var index = 0;
         foreach (var c in columns)
         {
-            var data = row.AsSpan(index, c.Attribute.Length);
-            index += c.Attribute.Length;
+            var data = row.AsSpan(c.Start, c.Attribute.Length);
             if (c.Attribute.Trim) data = data.Trim();
             var span = data;
             bool parseFailed = false;
@@ -564,14 +612,28 @@ public class FWFile<T> where T : new()
         }
     }
 
+    private static void ValidateNoOverlap(List<Column> columns)
+    {
+        for (var i = 0; i < columns.Count; i++)
+        for (var j = i + 1; j < columns.Count; j++)
+        {
+            var a = columns[i];
+            var b = columns[j];
+            var aStart = a.Start;
+            var aEnd = a.Start + a.Attribute.Length;
+            var bStart = b.Start;
+            var bEnd = b.Start + b.Attribute.Length;
+            if (aStart < bEnd && bStart < aEnd)
+                throw new FWParseException($"Fields '{a.Member.Name}' and '{b.Member.Name}' overlap.");
+        }
+    }
+
     private bool IsHeaderLine(string row)
     {
         if (row.Length != rowLength) return false;
-        var index = 0;
         foreach (var c in columns)
         {
-            var field = row.AsSpan(index, c.Attribute.Length);
-            index += c.Attribute.Length;
+            var field = row.AsSpan(c.Start, c.Attribute.Length);
             var header = c.Attribute.Header ?? string.Empty;
             if (!field.Trim().Equals(header.AsSpan(), StringComparison.OrdinalIgnoreCase)) return false;
         }
@@ -588,7 +650,8 @@ public class FWFile<T> where T : new()
     public string Format(T record)
     {
         EnsureValidated();
-        var sb = new StringBuilder(rowLength);
+        var chars = new char[rowLength];
+        for (var i = 0; i < chars.Length; i++) chars[i] = ' ';
         foreach (var c in columns)
         {
             var value = c.Member is FieldInfo fi ? fi.GetValue(record) : ((PropertyInfo)c.Member).GetValue(record);
@@ -596,6 +659,12 @@ public class FWFile<T> where T : new()
             if (c.Converter is not null)
             {
                 text = c.Converter.Write(value, c.NonNullableType);
+            }
+            else if (c.Attribute.Decimals > 0 && value is not null && value is not string && value is not bool)
+            {
+                var factor = (decimal)Math.Pow(10, c.Attribute.Decimals);
+                var scaled = Convert.ToDecimal(value, c.Culture) * factor;
+                text = ((long)Math.Round(scaled)).ToString(c.Culture);
             }
             else
             {
@@ -622,11 +691,34 @@ public class FWFile<T> where T : new()
                     throw new FWParseException($"Value does not fit in field '{c.Member.Name}' (position {c.Start}, length {c.Attribute.Length})");
                 }
             }
-            sb.Append(c.Attribute.RightAlign
-                ? text.PadLeft(c.Attribute.Length, c.Attribute.PadChar)
-                : text.PadRight(c.Attribute.Length, c.Attribute.PadChar));
+
+            bool rightAlign = c.Attribute.RightAlign;
+            char padChar = c.Attribute.PadChar;
+            if (!rightAlign && padChar == ' ' && value is not null && value is not string && value is not bool
+                && value is not DateTime && value is not DateOnly && value is not TimeOnly && value is not Guid && value is not char)
+            {
+                rightAlign = true;
+                padChar = '0';
+            }
+
+            string prefix = "";
+            string core = text;
+            if (rightAlign && padChar == '0' && core.StartsWith("-"))
+            {
+                prefix = "-";
+                core = core.Substring(1);
+            }
+            string paddedCore = rightAlign
+                ? core.PadLeft(Math.Max(0, c.Attribute.Length - prefix.Length), padChar)
+                : core.PadRight(c.Attribute.Length, padChar);
+            string padded = prefix + paddedCore;
+            if (padded.Length > c.Attribute.Length)
+                padded = padded.Substring(padded.Length - c.Attribute.Length);
+
+            for (var i = 0; i < padded.Length && c.Start + i < chars.Length; i++)
+                chars[c.Start + i] = padded[i];
         }
-        return sb.ToString();
+        return new string(chars);
     }
 
     public void Write(Stream stream, IEnumerable<T> records, Encoding? encoding = null, bool writeHeader = false)
@@ -635,14 +727,17 @@ public class FWFile<T> where T : new()
         using var writer = new StreamWriter(stream, encoding ?? Encoding.UTF8, leaveOpen: true);
         if (writeHeader)
         {
-            var header = new StringBuilder(rowLength);
+            var hchars = new char[rowLength];
+            for (var i = 0; i < hchars.Length; i++) hchars[i] = ' ';
             foreach (var c in columns)
             {
                 var h = c.Attribute.Header ?? string.Empty;
                 if (h.Length > c.Attribute.Length) h = h.Substring(0, c.Attribute.Length);
-                header.Append(h.PadRight(c.Attribute.Length));
+                h = h.PadRight(c.Attribute.Length);
+                for (var i = 0; i < h.Length && c.Start + i < hchars.Length; i++)
+                    hchars[c.Start + i] = h[i];
             }
-            writer.WriteLine(header.ToString());
+            writer.WriteLine(new string(hchars));
         }
         foreach (var r in records)
         {

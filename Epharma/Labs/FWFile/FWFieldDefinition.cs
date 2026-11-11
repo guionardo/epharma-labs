@@ -14,6 +14,7 @@ public class FWFieldDefinition
     public bool Trim { get; set; } = true;
     public char PadChar { get; set; } = ' ';
     public bool RightAlign { get; set; }
+    public int Decimals { get; set; }
 
     public CultureInfo GetCulture() =>
         string.IsNullOrWhiteSpace(Culture) ? CultureInfo.InvariantCulture : new CultureInfo(Culture);

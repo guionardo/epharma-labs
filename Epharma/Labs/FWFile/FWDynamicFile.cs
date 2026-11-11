@@ -8,6 +8,11 @@ public class FWDynamicFile
 {
     public FWLayout Layout { get; }
 
+    static FWDynamicFile()
+    {
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+    }
+
     public FWDynamicFile(FWLayout layout)
     {
         Layout = layout ?? throw new ArgumentNullException(nameof(layout));
@@ -25,6 +30,10 @@ public class FWDynamicFile
         {
             return field.Type == FWFieldType.String ? string.Empty : null;
         }
+        if ((field.Type == FWFieldType.DateTime || field.Type == FWFieldType.DateOnly || field.Type == FWFieldType.TimeOnly || field.Type == FWFieldType.DateTimeOffset || field.Type == FWFieldType.TimeSpan) && span.Trim('0').IsEmpty)
+        {
+            return null;
+        }
         switch (field.Type)
         {
             case FWFieldType.String: return span.ToString();
@@ -34,7 +43,13 @@ public class FWDynamicFile
             case FWFieldType.Byte: byte.TryParse(span, NumberStyles.Integer, culture, out var by); return by;
             case FWFieldType.Float: float.TryParse(span, NumberStyles.Float, culture, out var f); return f;
             case FWFieldType.Double: double.TryParse(span, NumberStyles.Float, culture, out var d); return d;
-            case FWFieldType.Decimal: decimal.TryParse(span, NumberStyles.Number & ~NumberStyles.AllowThousands, culture, out var dec); return dec;
+            case FWFieldType.Decimal:
+                if (field.Decimals > 0)
+                {
+                    if (long.TryParse(span, NumberStyles.Integer, culture, out var sc)) return sc / (decimal)Math.Pow(10, field.Decimals);
+                    return 0m;
+                }
+                decimal.TryParse(span, NumberStyles.Number & ~NumberStyles.AllowThousands, culture, out var dec); return dec;
             case FWFieldType.Bool:
                 var s = span.ToString();
                 if (s.Equals("true", StringComparison.InvariantCultureIgnoreCase) || s == "1" || s.Equals("y", StringComparison.InvariantCultureIgnoreCase) || s.Equals("s", StringComparison.InvariantCultureIgnoreCase)) return true;
@@ -73,6 +88,15 @@ public class FWDynamicFile
             case FWFieldType.DateTime: text = ((DateTime)value).ToString(string.IsNullOrWhiteSpace(field.Format) ? "yyyy-MM-dd" : field.Format, culture); break;
             case FWFieldType.DateOnly: text = ((DateOnly)value).ToString(string.IsNullOrWhiteSpace(field.Format) ? "yyyy-MM-dd" : field.Format, culture); break;
             case FWFieldType.TimeOnly: text = ((TimeOnly)value).ToString(string.IsNullOrWhiteSpace(field.Format) ? "HH:mm:ss" : field.Format, culture); break;
+            case FWFieldType.Decimal:
+                if (field.Decimals > 0)
+                {
+                    var factor = (decimal)Math.Pow(10, field.Decimals);
+                    text = ((long)Math.Round(Convert.ToDecimal(value, culture) * factor)).ToString(culture);
+                }
+                else
+                    text = value is decimal dv ? dv.ToString(culture) : value.ToString() ?? string.Empty;
+                break;
             default: text = value.ToString() ?? string.Empty; break;
         }
         if (text.Length > field.Length) text = text.Substring(0, field.Length);
@@ -121,11 +145,22 @@ public class FWDynamicFile
             for (var i = 0; i < chars.Length; i++) chars[i] = ' ';
             foreach (var field in Layout.Fields)
             {
-                var text = FormatField(field, record.TryGetValue(field.Name, out var v) ? v : null);
+                var value = record.TryGetValue(field.Name, out var v) ? v : null;
+                var text = FormatField(field, value);
                 var arr = text.ToCharArray();
                 var len = Math.Min(arr.Length, field.Length);
+                bool rightAlign = field.RightAlign;
+                char padChar = field.PadChar;
+                if (!rightAlign && padChar == ' ' && value is not null && value is not string && value is not bool && value is not DateTime && value is not DateOnly && value is not TimeOnly && value is not Guid && value is not char)
+                {
+                    rightAlign = true;
+                    padChar = '0';
+                }
+                // fill field area with padChar first
+                for (var i = 0; i < field.Length; i++)
+                    if (field.Start + i < chars.Length) chars[field.Start + i] = padChar;
                 int offset;
-                if (field.RightAlign)
+                if (rightAlign)
                     offset = field.Start + field.Length - len;
                 else
                     offset = field.Start;
