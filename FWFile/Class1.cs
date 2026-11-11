@@ -69,13 +69,13 @@ public class FWParseException : Exception
 
 public class FWFile<T> where T : new()
 {
-    record Column<T>
+    record Column
     {
-        internal FWFieldAttribute Attribute;
-        internal FieldInfo FieldInfo;
+        internal FWFieldAttribute Attribute = null!;
+        internal FieldInfo FieldInfo = null!;
 
-        internal Action<string, T> ReadData;
-        internal Column<T> Validate()
+        internal Action<string, T> ReadData = null!;
+        internal Column Validate()
         {
             // Accepted types: int, decimal, float, bool, string, datetime, date, time
             var ft = FieldInfo.FieldType;
@@ -208,7 +208,7 @@ public class FWFile<T> where T : new()
             throw new FWParseException($"Failed to parse value '{data}' to TimeOnly field '{FieldInfo.Name}");
         }
     }
-    private List<Column<T>> columns = [];
+    private List<Column> columns = [];
     private int rowLength = 0;
     public FWFile()
     {
@@ -232,7 +232,7 @@ public class FWFile<T> where T : new()
             }
             rowLength += attribute.Length;
 
-            columns.Add(new Column<T> { Attribute = attribute, FieldInfo = field }.Validate());
+            columns.Add(new Column { Attribute = attribute, FieldInfo = field }.Validate());
         }
         if (columns.Count == 0)
         {
