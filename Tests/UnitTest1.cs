@@ -10,7 +10,7 @@ public class SampleFW
     public int Id;
 
     [FWField(20)]
-    public string Name;
+    public string Name = default!;
 
     [FWField(10)]
     public decimal Price;
