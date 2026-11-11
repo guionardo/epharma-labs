@@ -124,7 +124,7 @@ public class FWFile<T> where T : new()
         }
         internal void ReadInt(string data, T record)
         {
-            if (!int.TryParse(data, out var i))
+            if (!int.TryParse(data, NumberStyles.Integer, CultureInfo.InvariantCulture, out var i))
             {
                 throw new FWParseException($"Failed to parse value '{data}' to int field '{FieldInfo.Name}");
             }
