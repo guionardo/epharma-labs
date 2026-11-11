@@ -172,7 +172,7 @@ public class FWFile<T> where T : new()
         {
             foreach (var template in Attribute.DateFormats)
             {
-                if (DateOnly.TryParseExact(data, template, out var d))
+                if (DateOnly.TryParseExact(data, template, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d))
                 {
                     FieldInfo.SetValue(record, d);
                     return;
