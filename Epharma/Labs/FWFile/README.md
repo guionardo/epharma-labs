@@ -32,6 +32,53 @@ foreach (var row in f.ParseStream(stream))
 - Convenções legado: decimal implícito (`Decimals`), `Start` posicional, datas zeradas tratadas como nulas, formatos sem separador (`yyyyMMdd`, `ddMMyyyy`), encoding legado (Latin-1/Windows-1252 via `CodePagesEncodingProvider`), numéricos alinhados à direita com zero à esquerda.
 - Segurança: mensagens de erro não expõem a linha/valor bruto; dados disponíveis via propriedades da `FWParseException`.
 
+## Exemplos
+
+### Múltiplos tipos de registro
+
+```csharp
+var multi = new FWMultiFile()
+    .Record<Header>("0")
+    .Record<Detail>("1")
+    .Record<Trailer>("9")
+    .TrailerValidator(records => { /* valida totais */ });
+
+foreach (var rec in multi.ParseStream(stream))
+    Console.WriteLine(rec.GetType().Name);
+```
+
+### Validação acumulada
+
+```csharp
+var f = new FWFile<Row>();
+foreach (var r in f.ParseStreamWithValidation(stream))
+{
+    if (!r.IsValid)
+        foreach (var issue in r.Issues)
+            Console.WriteLine(issue);
+}
+```
+
+### Layout dinâmico (JSON)
+
+```csharp
+var json = "[{\"Name\":\"Id\",\"Length\":4,\"Type\":\"Int\"},{\"Name\":\"Name\",\"Length\":10,\"Type\":\"String\"}]";
+var layout = FWLayout.FromJson(json);
+var file = new FWDynamicFile(layout);
+foreach (var rec in file.ParseStream(stream))
+    Console.WriteLine(rec["Id"]);
+```
+
+### Convenções legado
+
+```csharp
+public class Legacy
+{
+    [FWField(6, Decimals = 2)] public decimal Amount;
+    [FWField(8, Start = 6, DateTimeFormat = "yyyyMMdd")] public DateTime? Date;
+}
+```
+
 ## Performance
 
 Benchmark (100k linhas, release):

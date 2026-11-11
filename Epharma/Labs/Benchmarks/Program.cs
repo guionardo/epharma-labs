@@ -49,6 +49,46 @@ public class FixedWidthBenchmarks
     }
 }
 
+[MemoryDiagnoser]
+public class MultiFileBenchmarks
+{
+    private byte[] _data = Array.Empty<byte>();
+    private const int Rows = 100_000;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        var lines = new StringBuilder();
+        lines.Append("0    2\n"); // header Count=2 (placeholder)
+        for (int i = 0; i < Rows; i++)
+        {
+            lines.Append("1");
+            lines.Append($"{i % 9999 + 1,4}");
+            lines.Append("Paciente Teste      ");
+            lines.Append('\n');
+        }
+        lines.Append("9    2\n");
+        _data = Encoding.UTF8.GetBytes(lines.ToString());
+    }
+
+    [Benchmark]
+    public int ParseMulti()
+    {
+        using var ms = new MemoryStream(_data);
+        var multi = new FWMultiFile()
+            .Record<MultiHeaderBench>("0")
+            .Record<MultiDetailBench>("1")
+            .Record<MultiTrailerBench>("9");
+        int n = 0;
+        foreach (var _ in multi.ParseStream(ms)) n++;
+        return n;
+    }
+}
+
+public class MultiHeaderBench { [FWField(1)] public string Type = ""; [FWField(5)] public int Count; }
+public class MultiDetailBench { [FWField(1)] public string Type = ""; [FWField(4)] public int Id; [FWField(20)] public string Name = default!; }
+public class MultiTrailerBench { [FWField(1)] public string Type = ""; [FWField(5)] public int Total; }
+
 public class BenchModel
 {
     [FWField(4)]
