@@ -5,7 +5,7 @@ using System.Threading;
 using System.Runtime.CompilerServices;
 using System.Linq.Expressions;
 
-namespace fwfile;
+namespace Epharma.Labs.FWFile;
 
 public class FWFile<T> where T : new()
 {

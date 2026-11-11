@@ -1,4 +1,4 @@
-namespace fwfile;
+namespace Epharma.Labs.FWFile;
 
 /// <summary>Custom conversion between a fixed-width field string and a CLR value.</summary>
 public interface IFWConverter

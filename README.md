@@ -1,38 +1,9 @@
-# fwfile
+# epharma-labs
 
-Biblioteca .NET para leitura e escrita de arquivos de largura fixa (fixed-width).
+Repositório de componentes e provas de conceito (PoCs) utilizados no projeto Epharma.
 
-## Uso básico
+> Este repositório **não** deve conter código proprietário da Epharma. Apenas componentes genéricos, reutilizáveis e experimentos técnicos.
 
-```csharp
-public class SampleFW
-{
-    [FWField(4)]  public int Id;
-    [FWField(20)] public string Name = default!;
-    [FWField(10)] public decimal Price;
-}
+## Projetos
 
-var f = new FWFile<SampleFW>();
-using var stream = File.OpenRead("data.txt");
-foreach (var row in f.ParseStream(stream))
-    Console.WriteLine(row);
-```
-
-## Funcionalidades
-
-- Tipos suportados: `string`, `int`, `float`, `decimal`, `bool`, `DateTime`, `DateOnly`, `TimeOnly` e seus nullable.
-- Formatos customizáveis por campo (data/hora), valores booleanos, trim, alinhamento, padding.
-- Leitura síncrona (`ParseStream`) e assíncrona (`ParseStreamAsync`).
-- Escrita (`Write`/`WriteAsync`/`Format`).
-- Opções: `skipHeader`, `maxRows`, `lenient`, `encoding`, `CancellationToken`, `Order`.
-
-## Performance
-
-Benchmark (100k linhas, release):
-
-| Método | Tempo | Alocação |
-|---|---|---|
-| ParseStream | ~85 ms | ~40 MB |
-| ParseStreamAsync | ~93 ms | ~47 MB |
-
-Rode com `dotnet run -c Release --project Benchmarks`.
+- [FWFile](./Epharma/Labs/FWFile/README.md) — Biblioteca .NET para leitura e escrita de arquivos de largura fixa (fixed-width).

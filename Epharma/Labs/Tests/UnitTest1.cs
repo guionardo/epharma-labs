@@ -1,7 +1,7 @@
-﻿namespace Tests;
+﻿namespace Epharma.Labs.Tests;
 
 using System.Text;
-using fwfile;
+using Epharma.Labs.FWFile;
 using Xunit.Abstractions;
 
 public class SampleFW

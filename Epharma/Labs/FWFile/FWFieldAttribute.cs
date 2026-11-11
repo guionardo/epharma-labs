@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace fwfile;
+namespace Epharma.Labs.FWFile;
 
 /// <summary>Describes a fixed-width field.</summary>
 [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = false)]

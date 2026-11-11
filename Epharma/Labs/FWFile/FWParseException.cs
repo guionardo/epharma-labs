@@ -1,4 +1,4 @@
-namespace fwfile;
+namespace Epharma.Labs.FWFile;
 
 /// <summary>Exception thrown when parsing a fixed-width file fails.</summary>
 public class FWParseException : Exception

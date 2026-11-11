@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/FWFile/" />
+  <Project Path="Epharma/Labs/FWFile/fwfile.csproj" />
+  <Project Path="Epharma/Labs/Tests/Tests.csproj" />
+  <Project Path="Epharma/Labs/Benchmarks/Benchmarks.csproj" />
+</Solution>

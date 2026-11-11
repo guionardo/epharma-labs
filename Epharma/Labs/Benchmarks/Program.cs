@@ -1,6 +1,6 @@
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Running;
-using fwfile;
+using Epharma.Labs.FWFile;
 using System.Text;
 
 BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
