@@ -192,6 +192,7 @@ public class FWFile<T> where T : new()
 
             columns.Add(new Column { Attribute = attribute, Member = member }.Validate());
         }
+        columns = columns.OrderBy(c => c.Attribute.Order).ToList();
         if (columns.Count == 0)
         {
             throw new FWParseException($"There is no field defined with the {nameof(FWFieldAttribute)} attribute in the type {nameof(T)}");
