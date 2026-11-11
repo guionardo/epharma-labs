@@ -1,5 +1,7 @@
 ﻿using System.Reflection;
 using System.Globalization;
+using System.Text;
+using System.Threading;
 
 namespace fwfile;
 // 1. Specify where the attribute can be used
@@ -253,17 +255,26 @@ public class FWFile<T> where T : new()
         return record;
     }
 
-    public IEnumerable<T> ParseStream(Stream stream)
+    public IEnumerable<T> ParseStream(Stream stream, Encoding? encoding = null, bool skipHeader = false, int maxRows = 0, CancellationToken cancellationToken = default)
     {
-        using var reader = new StreamReader(stream);
+        using var reader = new StreamReader(stream, encoding ?? Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
         var index = 0;
-        string data;
+        if (skipHeader)
+        {
+            reader.ReadLine();
+            index = 1;
+        }
+        string? data;
         T e;
+        var yielded = 0;
         while (true)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (maxRows > 0 && yielded >= maxRows) break;
             index++;
             data = reader.ReadLine();
             if (data is null) break; // End of stream
+            if (data.Length == 0) continue; // skip empty lines
             try
             {
                 e = ParseRow(data);
@@ -272,6 +283,7 @@ public class FWFile<T> where T : new()
             {
                 throw new FWParseException($"failed parsing line #{index} : '{data}' : {ex.Message}", ex);
             }
+            yielded++;
             yield return e;
         }
     }
