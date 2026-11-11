@@ -149,7 +149,7 @@ public class FWFile<T> where T : new()
         }
         internal void ReadDecimal(string data, T record)
         {
-            if (!decimal.TryParse(data, out var d))
+            if (!decimal.TryParse(data, NumberStyles.Number, CultureInfo.InvariantCulture, out var d))
             {
                 throw new FWParseException($"Failed to parse value '{data}' to Decimal field '{FieldInfo.Name}'");
             }
