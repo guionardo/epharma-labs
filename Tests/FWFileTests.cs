@@ -36,7 +36,6 @@ public class FWFileTests(ITestOutputHelper output)
     public void ParseTimeOnly()
     {
         var f = new FWFile<RoundTripModel>();
-        var rows = "   1     10.001977-02-0501:02:03S    ";
         // Build a properly sized row manually
         var row = "   1" + "     10.00" + "1977-02-05" + "01:02:03" + "2001-01-01" + "S    ";
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes(row));
