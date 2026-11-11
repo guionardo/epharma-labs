@@ -2,4 +2,5 @@
   <Folder Name="/FWFile/" />
   <Project Path="FWFile/fwfile.csproj" />
   <Project Path="Tests/Tests.csproj" />
+  <Project Path="Benchmarks/Benchmarks.csproj" />
 </Solution>
