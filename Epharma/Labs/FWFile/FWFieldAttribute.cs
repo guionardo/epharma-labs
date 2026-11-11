@@ -40,6 +40,12 @@ public class FWFieldAttribute : Attribute
     public readonly string[] BoolFalseValueTokens;
     public bool Truncate { get; private set; } = true;
 
+    public bool Required { get; set; }
+    public string Regex { get; set; } = "";
+    public string AllowedValues { get; set; } = "";
+    public string Min { get; set; } = "";
+    public string Max { get; set; } = "";
+
     public readonly string[] DateTimeFormats;
 
     public readonly string[] DateFormats;

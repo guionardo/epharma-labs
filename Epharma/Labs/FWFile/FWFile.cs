@@ -324,6 +324,7 @@ public class FWFile<T> where T : new()
     private readonly List<(MemberInfo Member, FWFieldAttribute Attribute)> _definitions = new();
     private bool _hasDefinitions;
     private bool _validated;
+    private Func<T, IEnumerable<FWValidationIssue>>? _validator;
 
     public FWFile()
     {
@@ -360,6 +361,12 @@ public class FWFile<T> where T : new()
             if (columns.Count == 0) throw new FWParseException($"There is no field defined for the type {typeof(T).Name}");
         }
         _validated = true;
+    }
+
+    public FWFile<T> Validator(Func<T, IEnumerable<FWValidationIssue>> validator)
+    {
+        _validator = validator;
+        return this;
     }
 
     public FWFile<T> Field<TValue>(Expression<Func<T, TValue>> selector, int length, Action<FWFieldAttribute>? configure = null)
@@ -440,6 +447,121 @@ public class FWFile<T> where T : new()
             }
         }
         return record;
+    }
+
+    private (T Record, List<FWValidationIssue> Issues) ParseRowValidated(string row, int lineNumber, bool lenient, ref bool truncated)
+    {
+        EnsureValidated();
+        var issues = new List<FWValidationIssue>();
+        if (row.Length != rowLength)
+        {
+            if (lenient)
+            {
+                truncated = true;
+                issues.Add(new FWValidationIssue(lineNumber, null, 0, FWValidationSeverity.Warning, $"Row length {row.Length} differs from expected {rowLength}; normalized."));
+                row = row.Length < rowLength ? row.PadRight(rowLength) : row.Substring(0, rowLength);
+            }
+            else
+            {
+                issues.Add(new FWValidationIssue(lineNumber, null, 0, FWValidationSeverity.Error, $"Expected row with length {rowLength} but found {row.Length}."));
+                return (new T(), issues);
+            }
+        }
+        T record = new();
+        var index = 0;
+        foreach (var c in columns)
+        {
+            var data = row.AsSpan(index, c.Attribute.Length);
+            index += c.Attribute.Length;
+            if (c.Attribute.Trim) data = data.Trim();
+            var span = data;
+            bool parseFailed = false;
+            try
+            {
+                c.ReadData(span, record);
+            }
+            catch (Exception)
+            {
+                parseFailed = true;
+                if (c.Attribute.HasDefaultValue)
+                {
+                    c.SetMemberValue(record, c.ResolveDefaultValue());
+                    issues.Add(new FWValidationIssue(lineNumber, c.Member.Name, c.Start, FWValidationSeverity.Warning, $"Failed to parse field; default value applied."));
+                }
+                else
+                {
+                    issues.Add(new FWValidationIssue(lineNumber, c.Member.Name, c.Start, FWValidationSeverity.Error, $"Failed to parse field to {c.NonNullableType.Name}."));
+                }
+            }
+            if (!parseFailed)
+            {
+                ValidateFieldRules(c, record, issues, lineNumber);
+            }
+        }
+        if (_validator is not null)
+        {
+            try
+            {
+                var custom = _validator(record);
+                if (custom is not null)
+                    issues.AddRange(custom.Select(i => i with { Line = lineNumber }));
+            }
+            catch (Exception ex)
+            {
+                issues.Add(new FWValidationIssue(lineNumber, null, 0, FWValidationSeverity.Error, $"Validator threw: {ex.Message}"));
+            }
+        }
+        return (record, issues);
+    }
+
+    private void ValidateFieldRules(Column c, T record, List<FWValidationIssue> issues, int lineNumber)
+    {
+        var attr = c.Attribute;
+        var value = c.Member is FieldInfo fi ? fi.GetValue(record) : ((PropertyInfo)c.Member).GetValue(record);
+
+        if (attr.Required)
+        {
+            if (value is null || (value is string s && string.IsNullOrWhiteSpace(s)))
+                issues.Add(new FWValidationIssue(lineNumber, c.Member.Name, c.Start, FWValidationSeverity.Error, "Required field is empty."));
+        }
+        if (!string.IsNullOrWhiteSpace(attr.AllowedValues))
+        {
+            var allowed = attr.AllowedValues.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            if (value is not null && !allowed.Contains(value.ToString()!, StringComparer.InvariantCultureIgnoreCase))
+                issues.Add(new FWValidationIssue(lineNumber, c.Member.Name, c.Start, FWValidationSeverity.Error, "Value is not in allowed list."));
+        }
+        if (!string.IsNullOrWhiteSpace(attr.Regex) && value is string sv)
+        {
+            if (!System.Text.RegularExpressions.Regex.IsMatch(sv, attr.Regex))
+                issues.Add(new FWValidationIssue(lineNumber, c.Member.Name, c.Start, FWValidationSeverity.Error, "Value does not match pattern."));
+        }
+        if (value is not null && (!string.IsNullOrWhiteSpace(attr.Min) || !string.IsNullOrWhiteSpace(attr.Max)))
+        {
+            var comparable = value as IComparable;
+            if (comparable is not null)
+            {
+                if (!string.IsNullOrWhiteSpace(attr.Min))
+                {
+                    try
+                    {
+                        var minVal = Convert.ChangeType(attr.Min, c.NonNullableType, c.Culture);
+                        if (minVal is IComparable mc && comparable.CompareTo(mc) < 0)
+                            issues.Add(new FWValidationIssue(lineNumber, c.Member.Name, c.Start, FWValidationSeverity.Error, $"Value is less than minimum {attr.Min}."));
+                    }
+                    catch { }
+                }
+                if (!string.IsNullOrWhiteSpace(attr.Max))
+                {
+                    try
+                    {
+                        var maxVal = Convert.ChangeType(attr.Max, c.NonNullableType, c.Culture);
+                        if (maxVal is IComparable mc && comparable.CompareTo(mc) > 0)
+                            issues.Add(new FWValidationIssue(lineNumber, c.Member.Name, c.Start, FWValidationSeverity.Error, $"Value is greater than maximum {attr.Max}."));
+                    }
+                    catch { }
+                }
+            }
+        }
     }
 
     private bool IsHeaderLine(string row)
@@ -564,6 +686,84 @@ public class FWFile<T> where T : new()
         {
             EnsureValidated();
             return rowLength;
+        }
+    }
+
+    public IEnumerable<FWParseResult<T>> ParseStreamWithValidation(Stream stream, Encoding? encoding = null, bool skipHeader = false, int maxRows = 0, bool lenient = false, bool autoSkipHeader = false, int maxErrors = 0, CancellationToken cancellationToken = default)
+    {
+        EnsureValidated();
+        using var reader = new StreamReader(stream, encoding ?? Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
+        var index = 0;
+        if (skipHeader)
+        {
+            reader.ReadLine();
+            index = 1;
+        }
+        string? data;
+        var yielded = 0;
+        var firstLine = !skipHeader;
+        var totalErrors = 0;
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (maxRows > 0 && yielded >= maxRows) break;
+            index++;
+            data = reader.ReadLine();
+            if (data is null) break;
+            if (data.Length == 0) continue;
+            if (firstLine && autoSkipHeader && IsHeaderLine(data))
+            {
+                firstLine = false;
+                continue;
+            }
+            firstLine = false;
+            bool truncated = false;
+            var (record, issues) = ParseRowValidated(data, index, lenient, ref truncated);
+            var errorCount = issues.Count(i => i.Severity == FWValidationSeverity.Error);
+            totalErrors += errorCount;
+            yielded++;
+            yield return new FWParseResult<T>(index, issues.Any(i => i.Severity == FWValidationSeverity.Error) ? default : record, issues);
+            if (maxErrors > 0 && totalErrors >= maxErrors)
+                throw new FWParseException($"Validation error limit ({maxErrors}) reached at line {index}.");
+        }
+    }
+
+    public async IAsyncEnumerable<FWParseResult<T>> ParseStreamWithValidationAsync(Stream stream, Encoding? encoding = null, bool skipHeader = false, int maxRows = 0, bool lenient = false, bool autoSkipHeader = false, int maxErrors = 0, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        EnsureValidated();
+        using var reader = new StreamReader(stream, encoding ?? Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
+        var index = 0;
+        if (skipHeader)
+        {
+            await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
+            index = 1;
+        }
+        string? data;
+        var yielded = 0;
+        var firstLine = !skipHeader;
+        var totalErrors = 0;
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (maxRows > 0 && yielded >= maxRows) break;
+            index++;
+            data = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
+            if (data is null) break;
+            if (data.Length == 0) continue;
+            if (firstLine && autoSkipHeader && IsHeaderLine(data))
+            {
+                firstLine = false;
+                continue;
+            }
+            firstLine = false;
+            bool truncated = false;
+            var (record, issues) = ParseRowValidated(data, index, lenient, ref truncated);
+            var errorCount = issues.Count(i => i.Severity == FWValidationSeverity.Error);
+            totalErrors += errorCount;
+            yielded++;
+            yield return new FWParseResult<T>(index, issues.Any(i => i.Severity == FWValidationSeverity.Error) ? default : record, issues);
+            if (maxErrors > 0 && totalErrors >= maxErrors)
+                throw new FWParseException($"Validation error limit ({maxErrors}) reached at line {index}.");
         }
     }
 
