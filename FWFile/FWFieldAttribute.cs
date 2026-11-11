@@ -2,7 +2,8 @@ using System.Globalization;
 
 namespace fwfile;
 
-[AttributeUsage(AttributeTargets.Field, AllowMultiple = false)]
+/// <summary>Describes a fixed-width field.</summary>
+[AttributeUsage(AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = false)]
 public class FWFieldAttribute : Attribute
 {
     public FWFieldAttribute(int length, string header = "", string? boolTrueValues = null, string dateTimeFormat = "", string dateFormat = "", string timeFormat = "", bool trim = true, char padChar = ' ', bool rightAlign = false)
