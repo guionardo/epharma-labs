@@ -15,7 +15,8 @@ public class FWFile<T> where T : new()
 
         internal bool IsNullable;
 
-        internal Action<string, T> ReadData = null!;
+        internal delegate void ReadDataDelegate(ReadOnlySpan<char> data, T record);
+        internal ReadDataDelegate ReadData = null!;
 
         internal void SetMemberValue(T record, object? value)
         {
@@ -67,22 +68,27 @@ public class FWFile<T> where T : new()
             return this;
         }
 
-        internal void ReadString(string data, T record)
+        internal void ReadString(ReadOnlySpan<char> data, T record)
         {
-            SetMemberValue(record, IsNullable && string.IsNullOrWhiteSpace(data) ? null : data);
+            if (IsNullable && data.Trim().IsEmpty)
+            {
+                SetMemberValue(record, null);
+                return;
+            }
+            SetMemberValue(record, data.ToString());
         }
-        internal void ReadInt(string data, T record)
+        internal void ReadInt(ReadOnlySpan<char> data, T record)
         {
-            if (IsNullable && string.IsNullOrWhiteSpace(data)) { SetMemberValue(record, null); return; }
+            if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
             if (!int.TryParse(data, NumberStyles.Integer, CultureInfo.InvariantCulture, out var i))
             {
                 throw new FWParseException($"Failed to parse value '{data}' to int field '{Member.Name}");
             }
             SetMemberValue(record, i);
         }
-        internal void ReadFloat(string data, T record)
+        internal void ReadFloat(ReadOnlySpan<char> data, T record)
         {
-            if (IsNullable && string.IsNullOrWhiteSpace(data)) { SetMemberValue(record, null); return; }
+            if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
             if (!float.TryParse(data, NumberStyles.Float, CultureInfo.InvariantCulture, out var f))
             {
                 throw new FWParseException($"Failed to parse value '{data}' to float field '{Member.Name}");
@@ -90,10 +96,11 @@ public class FWFile<T> where T : new()
             SetMemberValue(record, f);
         }
 
-        internal void ReadBool(string data, T record)
+        internal void ReadBool(ReadOnlySpan<char> data, T record)
         {
-            if (IsNullable && string.IsNullOrWhiteSpace(data)) { SetMemberValue(record, null); return; }
-            if (Attribute.BoolTrueValues.Contains(data))
+            if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
+            var s = data.ToString();
+            if (Attribute.BoolTrueValues.Contains(s))
             {
                 SetMemberValue(record, true);
                 return;
@@ -103,20 +110,20 @@ public class FWFile<T> where T : new()
                 SetMemberValue(record, b);
                 return;
             }
-            if (data.Equals("false", StringComparison.InvariantCultureIgnoreCase)
-                || data.Equals("0", StringComparison.InvariantCultureIgnoreCase)
-                || data.Equals("n", StringComparison.InvariantCultureIgnoreCase)
-                || data.Equals("no", StringComparison.InvariantCultureIgnoreCase)
-                || data.Equals("f", StringComparison.InvariantCultureIgnoreCase))
+            if (s.Equals("false", StringComparison.InvariantCultureIgnoreCase)
+                || s == "0"
+                || s.Equals("n", StringComparison.InvariantCultureIgnoreCase)
+                || s.Equals("no", StringComparison.InvariantCultureIgnoreCase)
+                || s.Equals("f", StringComparison.InvariantCultureIgnoreCase))
             {
                 SetMemberValue(record, false);
                 return;
             }
-            throw new FWParseException($"Failed to parse value '{data}' to bool field '{Member.Name}'");
+            throw new FWParseException($"Failed to parse value '{s}' to bool field '{Member.Name}'");
         }
-        internal void ReadDecimal(string data, T record)
+        internal void ReadDecimal(ReadOnlySpan<char> data, T record)
         {
-            if (IsNullable && string.IsNullOrWhiteSpace(data)) { SetMemberValue(record, null); return; }
+            if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
             if (!decimal.TryParse(data, NumberStyles.Number, CultureInfo.InvariantCulture, out var d))
             {
                 throw new FWParseException($"Failed to parse value '{data}' to Decimal field '{Member.Name}'");
@@ -124,9 +131,9 @@ public class FWFile<T> where T : new()
             SetMemberValue(record, d);
         }
 
-        internal void ReadDateTime(string data, T record)
+        internal void ReadDateTime(ReadOnlySpan<char> data, T record)
         {
-            if (IsNullable && string.IsNullOrWhiteSpace(data)) { SetMemberValue(record, null); return; }
+            if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
             foreach (var template in Attribute.DateTimeFormats)
             {
                 if (DateTime.TryParseExact(data, template, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d))
@@ -137,9 +144,9 @@ public class FWFile<T> where T : new()
             }
             throw new FWParseException($"Failed to parse value '{data}' to DateTime field '{Member.Name}");
         }
-        internal void ReadDate(string data, T record)
+        internal void ReadDate(ReadOnlySpan<char> data, T record)
         {
-            if (IsNullable && string.IsNullOrWhiteSpace(data)) { SetMemberValue(record, null); return; }
+            if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
             foreach (var template in Attribute.DateFormats)
             {
                 if (DateOnly.TryParseExact(data, template, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d))
@@ -150,9 +157,9 @@ public class FWFile<T> where T : new()
             }
             throw new FWParseException($"Failed to parse value '{data}' to DateOnly field '{Member.Name}");
         }
-        internal void ReadTime(string data, T record)
+        internal void ReadTime(ReadOnlySpan<char> data, T record)
         {
-            if (IsNullable && string.IsNullOrWhiteSpace(data)) { SetMemberValue(record, null); return; }
+            if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
             foreach (var template in Attribute.TimeFormats)
             {
                 if (TimeOnly.TryParseExact(data, template, CultureInfo.InvariantCulture, DateTimeStyles.None, out var t))
@@ -206,9 +213,10 @@ public class FWFile<T> where T : new()
         var index = 0;
         foreach (var c in columns)
         {
-            var data = row.Substring(index, c.Attribute.Length);
+            var data = row.AsSpan(index, c.Attribute.Length);
             index += c.Attribute.Length;
-            c.ReadData(c.Attribute.Trim ? data.Trim() : data, record);
+            if (c.Attribute.Trim) data = data.Trim();
+            c.ReadData(data, record);
         }
         return record;
     }
