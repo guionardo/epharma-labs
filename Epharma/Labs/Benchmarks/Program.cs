@@ -18,7 +18,7 @@ public class FixedWidthBenchmarks
         for (int i = 0; i < Rows; i++)
         {
             lines.Append($"{i % 9999 + 1,4}");
-            lines.Append("Guionardo Furlan    ");
+            lines.Append("Paciente Teste      ");
             lines.Append("     10.00");
             lines.Append("1977-02-05");
             lines.Append("S    ");

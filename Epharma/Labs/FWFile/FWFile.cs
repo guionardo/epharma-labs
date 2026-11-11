@@ -27,6 +27,8 @@ public class FWFile<T> where T : new()
 
         internal Type NonNullableType => Nullable.GetUnderlyingType(FieldType) ?? FieldType;
 
+        internal int Start;
+
         internal string SelectBoolToken(bool value)
         {
             var tokens = value ? Attribute.BoolTrueValueTokens : Attribute.BoolFalseValueTokens;
@@ -162,7 +164,7 @@ public class FWFile<T> where T : new()
             if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
             if (!int.TryParse(data, NumberStyles.Integer, Culture, out var i))
             {
-                throw new FWParseException($"Failed to parse value '{data}' to int field '{Member.Name}'");
+                throw new FWParseException($"Failed to parse field '{Member.Name}' (position {Start}, length {Attribute.Length}) to int");
             }
             SetMemberValue(record, i);
         }
@@ -171,7 +173,7 @@ public class FWFile<T> where T : new()
             if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
             if (!float.TryParse(data, NumberStyles.Float, Culture, out var f))
             {
-                throw new FWParseException($"Failed to parse value '{data}' to float field '{Member.Name}'");
+                throw new FWParseException($"Failed to parse field '{Member.Name}' (position {Start}, length {Attribute.Length}) to float");
             }
             SetMemberValue(record, f);
         }
@@ -195,14 +197,14 @@ public class FWFile<T> where T : new()
                 SetMemberValue(record, false);
                 return;
             }
-            throw new FWParseException($"Failed to parse value '{s}' to bool field '{Member.Name}'");
+            throw new FWParseException($"Failed to parse field '{Member.Name}' (position {Start}, length {Attribute.Length}) to bool");
         }
         internal void ReadDecimal(ReadOnlySpan<char> data, T record)
         {
             if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
             if (!decimal.TryParse(data, NumberStyles.Number & ~NumberStyles.AllowThousands, Culture, out var d))
             {
-                throw new FWParseException($"Failed to parse value '{data}' to Decimal field '{Member.Name}'");
+                throw new FWParseException($"Failed to parse field '{Member.Name}' (position {Start}, length {Attribute.Length}) to Decimal");
             }
             SetMemberValue(record, d);
         }
@@ -218,7 +220,7 @@ public class FWFile<T> where T : new()
                     return;
                 }
             }
-            throw new FWParseException($"Failed to parse value '{data}' to DateTime field '{Member.Name}'");
+            throw new FWParseException($"Failed to parse field '{Member.Name}' (position {Start}, length {Attribute.Length}) to DateTime");
         }
         internal void ReadDate(ReadOnlySpan<char> data, T record)
         {
@@ -231,7 +233,7 @@ public class FWFile<T> where T : new()
                     return;
                 }
             }
-            throw new FWParseException($"Failed to parse value '{data}' to DateOnly field '{Member.Name}'");
+            throw new FWParseException($"Failed to parse field '{Member.Name}' (position {Start}, length {Attribute.Length}) to DateOnly");
         }
         internal void ReadTime(ReadOnlySpan<char> data, T record)
         {
@@ -244,7 +246,7 @@ public class FWFile<T> where T : new()
                     return;
                 }
             }
-            throw new FWParseException($"Failed to parse value '{data}' to TimeOnly field '{Member.Name}'");
+            throw new FWParseException($"Failed to parse field '{Member.Name}' (position {Start}, length {Attribute.Length}) to TimeOnly");
         }
 
         internal void ReadWithConverter(ReadOnlySpan<char> data, T record)
@@ -257,50 +259,50 @@ public class FWFile<T> where T : new()
         internal void ReadLong(ReadOnlySpan<char> data, T record)
         {
             if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
-            if (!long.TryParse(data, NumberStyles.Integer, Culture, out var v)) throw new FWParseException($"Failed to parse value '{data}' to long field '{Member.Name}'");
+            if (!long.TryParse(data, NumberStyles.Integer, Culture, out var v)) throw new FWParseException($"Failed to parse field '{Member.Name}' (position {Start}, length {Attribute.Length}) to long");
             SetMemberValue(record, v);
         }
         internal void ReadShort(ReadOnlySpan<char> data, T record)
         {
             if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
-            if (!short.TryParse(data, NumberStyles.Integer, Culture, out var v)) throw new FWParseException($"Failed to parse value '{data}' to short field '{Member.Name}'");
+            if (!short.TryParse(data, NumberStyles.Integer, Culture, out var v)) throw new FWParseException($"Failed to parse field '{Member.Name}' (position {Start}, length {Attribute.Length}) to short");
             SetMemberValue(record, v);
         }
         internal void ReadByte(ReadOnlySpan<char> data, T record)
         {
             if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
-            if (!byte.TryParse(data, NumberStyles.Integer, Culture, out var v)) throw new FWParseException($"Failed to parse value '{data}' to byte field '{Member.Name}'");
+            if (!byte.TryParse(data, NumberStyles.Integer, Culture, out var v)) throw new FWParseException($"Failed to parse field '{Member.Name}' (position {Start}, length {Attribute.Length}) to byte");
             SetMemberValue(record, v);
         }
         internal void ReadDouble(ReadOnlySpan<char> data, T record)
         {
             if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
-            if (!double.TryParse(data, NumberStyles.Float, Culture, out var v)) throw new FWParseException($"Failed to parse value '{data}' to double field '{Member.Name}'");
+            if (!double.TryParse(data, NumberStyles.Float, Culture, out var v)) throw new FWParseException($"Failed to parse field '{Member.Name}' (position {Start}, length {Attribute.Length}) to double");
             SetMemberValue(record, v);
         }
         internal void ReadChar(ReadOnlySpan<char> data, T record)
         {
             if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
             var t = data.Trim();
-            if (t.IsEmpty) { if (IsNullable) { SetMemberValue(record, null); return; } throw new FWParseException($"Failed to parse value '{data}' to char field '{Member.Name}'"); }
+            if (t.IsEmpty) { if (IsNullable) { SetMemberValue(record, null); return; } throw new FWParseException($"Failed to parse field '{Member.Name}' (position {Start}, length {Attribute.Length}) to char"); }
             SetMemberValue(record, t[0]);
         }
         internal void ReadGuid(ReadOnlySpan<char> data, T record)
         {
             if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
-            if (!Guid.TryParse(data.ToString(), out var v)) throw new FWParseException($"Failed to parse value '{data}' to Guid field '{Member.Name}'");
+            if (!Guid.TryParse(data.ToString(), out var v)) throw new FWParseException($"Failed to parse field '{Member.Name}' (position {Start}, length {Attribute.Length}) to Guid");
             SetMemberValue(record, v);
         }
         internal void ReadDateTimeOffset(ReadOnlySpan<char> data, T record)
         {
             if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
-            if (!DateTimeOffset.TryParse(data.ToString(), Culture, DateTimeStyles.None, out var v)) throw new FWParseException($"Failed to parse value '{data}' to DateTimeOffset field '{Member.Name}'");
+            if (!DateTimeOffset.TryParse(data.ToString(), Culture, DateTimeStyles.None, out var v)) throw new FWParseException($"Failed to parse field '{Member.Name}' (position {Start}, length {Attribute.Length}) to DateTimeOffset");
             SetMemberValue(record, v);
         }
         internal void ReadTimeSpan(ReadOnlySpan<char> data, T record)
         {
             if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
-            if (!TimeSpan.TryParse(data.ToString(), Culture, out var v)) throw new FWParseException($"Failed to parse value '{data}' to TimeSpan field '{Member.Name}'");
+            if (!TimeSpan.TryParse(data.ToString(), Culture, out var v)) throw new FWParseException($"Failed to parse field '{Member.Name}' (position {Start}, length {Attribute.Length}) to TimeSpan");
             SetMemberValue(record, v);
         }
         internal void ReadEnum(ReadOnlySpan<char> data, T record)
@@ -313,7 +315,7 @@ public class FWFile<T> where T : new()
             }
             catch (Exception ex)
             {
-                throw new FWParseException($"Failed to parse value '{data}' to enum field '{Member.Name}'", ex);
+                throw new FWParseException($"Failed to parse field '{Member.Name}' (position {Start}, length {Attribute.Length}) to enum", ex);
             }
         }
     }
@@ -351,6 +353,10 @@ public class FWFile<T> where T : new()
                 columns.Add(new Column { Attribute = attribute, Member = member }.Validate());
             }
             columns = columns.OrderBy(c => c.Attribute.Order).ToList();
+            {
+                var pos = 0;
+                foreach (var c in columns) { c.Start = pos; pos += c.Attribute.Length; }
+            }
             if (columns.Count == 0) throw new FWParseException($"There is no field defined for the type {typeof(T).Name}");
         }
         _validated = true;
@@ -395,6 +401,10 @@ public class FWFile<T> where T : new()
             columns.Add(new Column { Attribute = attribute, Member = member }.Validate());
         }
         columns = columns.OrderBy(c => c.Attribute.Order).ToList();
+        {
+            var pos = 0;
+            foreach (var c in columns) { c.Start = pos; pos += c.Attribute.Length; }
+        }
         if (columns.Count == 0)
         {
             throw new FWParseException($"There is no field defined with the {nameof(FWFieldAttribute)} attribute in the type {typeof(T).Name}");
@@ -418,6 +428,15 @@ public class FWFile<T> where T : new()
             catch (Exception) when (c.Attribute.HasDefaultValue)
             {
                 c.SetMemberValue(record, c.ResolveDefaultValue());
+            }
+            catch (Exception ex)
+            {
+                if (ex is FWParseException fpex)
+                {
+                    fpex.FieldName ??= c.Member.Name;
+                    fpex.Position ??= c.Start;
+                }
+                throw;
             }
         }
         return record;
@@ -478,7 +497,7 @@ public class FWFile<T> where T : new()
                 }
                 else
                 {
-                    throw new FWParseException($"Value '{text}' does not fit in field '{c.Member.Name}' of length {c.Attribute.Length}");
+                    throw new FWParseException($"Value does not fit in field '{c.Member.Name}' (position {c.Start}, length {c.Attribute.Length})");
                 }
             }
             sb.Append(c.Attribute.RightAlign
@@ -567,7 +586,7 @@ public class FWFile<T> where T : new()
             }
             catch (Exception ex)
             {
-                throw new FWParseException($"failed parsing line #{index} : '{data}' : {ex.Message}", ex);
+                throw new FWParseException($"failed parsing line #{index}: {ex.Message}", ex) { LineNumber = index };
             }
             yielded++;
             yield return e;
@@ -608,7 +627,7 @@ public class FWFile<T> where T : new()
             }
             catch (Exception ex)
             {
-                throw new FWParseException($"failed parsing line #{index} : '{data}' : {ex.Message}", ex);
+                throw new FWParseException($"failed parsing line #{index}: {ex.Message}", ex) { LineNumber = index };
             }
             yielded++;
             yield return e;
