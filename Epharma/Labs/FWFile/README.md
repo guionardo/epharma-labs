@@ -87,5 +87,6 @@ Benchmark (100k linhas, release):
 |---|---|---|
 | ParseStream | ~85 ms | ~40 MB |
 | ParseStreamAsync | ~93 ms | ~47 MB |
+| MultiFile ParseMulti | ~50 ms | ~25 MB |
 
-Rode com `dotnet run -c Release --project Epharma/Labs/Benchmarks`.
+Rode com `dotnet run -c Release --project Epharma/Labs/Benchmarks -- --filter '*'`.
