@@ -11,13 +11,19 @@ public class FWFile<T> where T : new()
     record Column
     {
         internal FWFieldAttribute Attribute = null!;
-        internal FieldInfo FieldInfo = null!;
+        internal MemberInfo Member = null!;
 
         internal Action<string, T> ReadData = null!;
+
+        internal void SetMemberValue(T record, object? value)
+        {
+            if (Member is FieldInfo fi) fi.SetValue(record, value);
+            else ((PropertyInfo)Member).SetValue(record, value);
+        }
         internal Column Validate()
         {
             // Accepted types: int, decimal, float, bool, string, datetime, date, time
-            var ft = FieldInfo.FieldType;
+            var ft = Member is FieldInfo fi ? fi.FieldType : ((PropertyInfo)Member).PropertyType;
             if (ft == typeof(string))
             {
                 ReadData = ReadString;
@@ -59,35 +65,35 @@ public class FWFile<T> where T : new()
 
         internal void ReadString(string data, T record)
         {
-            FieldInfo.SetValue(record, data);
+            SetMemberValue(record, data);
         }
         internal void ReadInt(string data, T record)
         {
             if (!int.TryParse(data, NumberStyles.Integer, CultureInfo.InvariantCulture, out var i))
             {
-                throw new FWParseException($"Failed to parse value '{data}' to int field '{FieldInfo.Name}");
+                throw new FWParseException($"Failed to parse value '{data}' to int field '{Member.Name}");
             }
-            FieldInfo.SetValue(record, i);
+            SetMemberValue(record, i);
         }
         internal void ReadFloat(string data, T record)
         {
             if (!float.TryParse(data, NumberStyles.Float, CultureInfo.InvariantCulture, out var f))
             {
-                throw new FWParseException($"Failed to parse value '{data}' to float field '{FieldInfo.Name}");
+                throw new FWParseException($"Failed to parse value '{data}' to float field '{Member.Name}");
             }
-            FieldInfo.SetValue(record, f);
+            SetMemberValue(record, f);
         }
 
         internal void ReadBool(string data, T record)
         {
             if (Attribute.BoolTrueValues.Contains(data))
             {
-                FieldInfo.SetValue(record, true);
+                SetMemberValue(record, true);
                 return;
             }
             if (bool.TryParse(data, out var b))
             {
-                FieldInfo.SetValue(record, b);
+                SetMemberValue(record, b);
                 return;
             }
             if (data.Equals("false", StringComparison.InvariantCultureIgnoreCase)
@@ -96,18 +102,18 @@ public class FWFile<T> where T : new()
                 || data.Equals("no", StringComparison.InvariantCultureIgnoreCase)
                 || data.Equals("f", StringComparison.InvariantCultureIgnoreCase))
             {
-                FieldInfo.SetValue(record, false);
+                SetMemberValue(record, false);
                 return;
             }
-            throw new FWParseException($"Failed to parse value '{data}' to bool field '{FieldInfo.Name}'");
+            throw new FWParseException($"Failed to parse value '{data}' to bool field '{Member.Name}'");
         }
         internal void ReadDecimal(string data, T record)
         {
             if (!decimal.TryParse(data, NumberStyles.Number, CultureInfo.InvariantCulture, out var d))
             {
-                throw new FWParseException($"Failed to parse value '{data}' to Decimal field '{FieldInfo.Name}'");
+                throw new FWParseException($"Failed to parse value '{data}' to Decimal field '{Member.Name}'");
             }
-            FieldInfo.SetValue(record, d);
+            SetMemberValue(record, d);
         }
 
         internal void ReadDateTime(string data, T record)
@@ -116,11 +122,11 @@ public class FWFile<T> where T : new()
             {
                 if (DateTime.TryParseExact(data, template, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d))
                 {
-                    FieldInfo.SetValue(record, d);
+                    SetMemberValue(record, d);
                     return;
                 }
             }
-            throw new FWParseException($"Failed to parse value '{data}' to DateTime field '{FieldInfo.Name}");
+            throw new FWParseException($"Failed to parse value '{data}' to DateTime field '{Member.Name}");
         }
         internal void ReadDate(string data, T record)
         {
@@ -128,11 +134,11 @@ public class FWFile<T> where T : new()
             {
                 if (DateOnly.TryParseExact(data, template, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d))
                 {
-                    FieldInfo.SetValue(record, d);
+                    SetMemberValue(record, d);
                     return;
                 }
             }
-            throw new FWParseException($"Failed to parse value '{data}' to DateOnly field '{FieldInfo.Name}");
+            throw new FWParseException($"Failed to parse value '{data}' to DateOnly field '{Member.Name}");
         }
         internal void ReadTime(string data, T record)
         {
@@ -140,11 +146,11 @@ public class FWFile<T> where T : new()
             {
                 if (TimeOnly.TryParseExact(data, template, CultureInfo.InvariantCulture, DateTimeStyles.None, out var t))
                 {
-                    FieldInfo.SetValue(record, t);
+                    SetMemberValue(record, t);
                     return;
                 }
             }
-            throw new FWParseException($"Failed to parse value '{data}' to TimeOnly field '{FieldInfo.Name}");
+            throw new FWParseException($"Failed to parse value '{data}' to TimeOnly field '{Member.Name}");
         }
     }
     private List<Column> columns = [];
@@ -159,19 +165,21 @@ public class FWFile<T> where T : new()
         Type typeInfo = typeof(T);
 
 
-        // Retrieve the fields of the class
-        foreach (var field in typeInfo.GetFields(BindingFlags.Public | BindingFlags.Instance))
+        // Retrieve the fields and public read/write properties of the class
+        var members = typeInfo.GetFields(BindingFlags.Public | BindingFlags.Instance).Cast<MemberInfo>()
+            .Concat(typeInfo.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(p => p.CanRead && p.CanWrite));
+        foreach (var member in members)
         {
-            var attribute = field.GetCustomAttribute<FWFieldAttribute>();
+            var attribute = member.GetCustomAttribute<FWFieldAttribute>();
             if (attribute is null) continue;
 
             if (string.IsNullOrWhiteSpace(attribute.Header))
             {
-                attribute.Header = field.Name;
+                attribute.Header = member.Name;
             }
             rowLength += attribute.Length;
 
-            columns.Add(new Column { Attribute = attribute, FieldInfo = field }.Validate());
+            columns.Add(new Column { Attribute = attribute, Member = member }.Validate());
         }
         if (columns.Count == 0)
         {
@@ -198,7 +206,7 @@ public class FWFile<T> where T : new()
         var sb = new StringBuilder(rowLength);
         foreach (var c in columns)
         {
-            var value = c.FieldInfo.GetValue(record);
+            var value = c.Member is FieldInfo fi ? fi.GetValue(record) : ((PropertyInfo)c.Member).GetValue(record);
             string text = value switch
             {
                 null => string.Empty,
