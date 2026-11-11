@@ -265,6 +265,28 @@ public class FWFile<T> where T : new()
         writer.Flush();
     }
 
+    public async Task WriteAsync(Stream stream, IEnumerable<T> records, Encoding? encoding = null, bool writeHeader = false, CancellationToken cancellationToken = default)
+    {
+        await using var writer = new StreamWriter(stream, encoding ?? Encoding.UTF8, leaveOpen: true);
+        if (writeHeader)
+        {
+            var header = new StringBuilder(rowLength);
+            foreach (var c in columns)
+            {
+                var h = c.Attribute.Header ?? string.Empty;
+                if (h.Length > c.Attribute.Length) h = h.Substring(0, c.Attribute.Length);
+                header.Append(h.PadRight(c.Attribute.Length));
+            }
+            await writer.WriteLineAsync(header.ToString()).ConfigureAwait(false);
+        }
+        foreach (var r in records)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await writer.WriteLineAsync(Format(r)).ConfigureAwait(false);
+        }
+        await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     public IEnumerable<T> ParseStream(Stream stream, Encoding? encoding = null, bool skipHeader = false, int maxRows = 0, bool lenient = false, CancellationToken cancellationToken = default)
     {
         using var reader = new StreamReader(stream, encoding ?? Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
