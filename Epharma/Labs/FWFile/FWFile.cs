@@ -552,6 +552,21 @@ public class FWFile<T> where T : new()
         await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    public T ParseLine(string row)
+    {
+        EnsureValidated();
+        return ParseRow(row);
+    }
+
+    public int RowLength
+    {
+        get
+        {
+            EnsureValidated();
+            return rowLength;
+        }
+    }
+
     public IEnumerable<T> ParseStream(Stream stream, Encoding? encoding = null, bool skipHeader = false, int maxRows = 0, bool lenient = false, bool autoSkipHeader = false, CancellationToken cancellationToken = default)
     {
         EnsureValidated();
