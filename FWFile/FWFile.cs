@@ -212,6 +212,13 @@ public class FWFile<T> where T : new()
         return record;
     }
 
+    private string NormalizeRow(string row)
+    {
+        if (row.Length == rowLength) return row;
+        if (row.Length < rowLength) return row.PadRight(rowLength);
+        return row.Substring(0, rowLength);
+    }
+
     public string Format(T record)
     {
         var sb = new StringBuilder(rowLength);
@@ -256,7 +263,7 @@ public class FWFile<T> where T : new()
         writer.Flush();
     }
 
-    public IEnumerable<T> ParseStream(Stream stream, Encoding? encoding = null, bool skipHeader = false, int maxRows = 0, CancellationToken cancellationToken = default)
+    public IEnumerable<T> ParseStream(Stream stream, Encoding? encoding = null, bool skipHeader = false, int maxRows = 0, bool lenient = false, CancellationToken cancellationToken = default)
     {
         using var reader = new StreamReader(stream, encoding ?? Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
         var index = 0;
@@ -278,7 +285,7 @@ public class FWFile<T> where T : new()
             if (data.Length == 0) continue; // skip empty lines
             try
             {
-                e = ParseRow(data);
+                e = ParseRow(lenient ? NormalizeRow(data) : data);
             }
             catch (Exception ex)
             {
@@ -289,7 +296,7 @@ public class FWFile<T> where T : new()
         }
     }
 
-    public async IAsyncEnumerable<T> ParseStreamAsync(Stream stream, Encoding? encoding = null, bool skipHeader = false, int maxRows = 0, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<T> ParseStreamAsync(Stream stream, Encoding? encoding = null, bool skipHeader = false, int maxRows = 0, bool lenient = false, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         using var reader = new StreamReader(stream, encoding ?? Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
         var index = 0;
@@ -311,7 +318,7 @@ public class FWFile<T> where T : new()
             T e;
             try
             {
-                e = ParseRow(data);
+                e = ParseRow(lenient ? NormalizeRow(data) : data);
             }
             catch (Exception ex)
             {
