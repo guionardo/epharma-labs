@@ -13,6 +13,8 @@ public class FWFile<T> where T : new()
         internal FWFieldAttribute Attribute = null!;
         internal MemberInfo Member = null!;
 
+        internal bool IsNullable;
+
         internal Action<string, T> ReadData = null!;
 
         internal void SetMemberValue(T record, object? value)
@@ -23,7 +25,9 @@ public class FWFile<T> where T : new()
         internal Column Validate()
         {
             // Accepted types: int, decimal, float, bool, string, datetime, date, time
-            var ft = Member is FieldInfo fi ? fi.FieldType : ((PropertyInfo)Member).PropertyType;
+            var rawType = Member is FieldInfo fi ? fi.FieldType : ((PropertyInfo)Member).PropertyType;
+            var ft = Nullable.GetUnderlyingType(rawType) ?? rawType;
+            IsNullable = rawType != ft;
             if (ft == typeof(string))
             {
                 ReadData = ReadString;
@@ -65,10 +69,11 @@ public class FWFile<T> where T : new()
 
         internal void ReadString(string data, T record)
         {
-            SetMemberValue(record, data);
+            SetMemberValue(record, IsNullable && string.IsNullOrWhiteSpace(data) ? null : data);
         }
         internal void ReadInt(string data, T record)
         {
+            if (IsNullable && string.IsNullOrWhiteSpace(data)) { SetMemberValue(record, null); return; }
             if (!int.TryParse(data, NumberStyles.Integer, CultureInfo.InvariantCulture, out var i))
             {
                 throw new FWParseException($"Failed to parse value '{data}' to int field '{Member.Name}");
@@ -77,6 +82,7 @@ public class FWFile<T> where T : new()
         }
         internal void ReadFloat(string data, T record)
         {
+            if (IsNullable && string.IsNullOrWhiteSpace(data)) { SetMemberValue(record, null); return; }
             if (!float.TryParse(data, NumberStyles.Float, CultureInfo.InvariantCulture, out var f))
             {
                 throw new FWParseException($"Failed to parse value '{data}' to float field '{Member.Name}");
@@ -86,6 +92,7 @@ public class FWFile<T> where T : new()
 
         internal void ReadBool(string data, T record)
         {
+            if (IsNullable && string.IsNullOrWhiteSpace(data)) { SetMemberValue(record, null); return; }
             if (Attribute.BoolTrueValues.Contains(data))
             {
                 SetMemberValue(record, true);
@@ -109,6 +116,7 @@ public class FWFile<T> where T : new()
         }
         internal void ReadDecimal(string data, T record)
         {
+            if (IsNullable && string.IsNullOrWhiteSpace(data)) { SetMemberValue(record, null); return; }
             if (!decimal.TryParse(data, NumberStyles.Number, CultureInfo.InvariantCulture, out var d))
             {
                 throw new FWParseException($"Failed to parse value '{data}' to Decimal field '{Member.Name}'");
@@ -118,6 +126,7 @@ public class FWFile<T> where T : new()
 
         internal void ReadDateTime(string data, T record)
         {
+            if (IsNullable && string.IsNullOrWhiteSpace(data)) { SetMemberValue(record, null); return; }
             foreach (var template in Attribute.DateTimeFormats)
             {
                 if (DateTime.TryParseExact(data, template, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d))
@@ -130,6 +139,7 @@ public class FWFile<T> where T : new()
         }
         internal void ReadDate(string data, T record)
         {
+            if (IsNullable && string.IsNullOrWhiteSpace(data)) { SetMemberValue(record, null); return; }
             foreach (var template in Attribute.DateFormats)
             {
                 if (DateOnly.TryParseExact(data, template, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d))
@@ -142,6 +152,7 @@ public class FWFile<T> where T : new()
         }
         internal void ReadTime(string data, T record)
         {
+            if (IsNullable && string.IsNullOrWhiteSpace(data)) { SetMemberValue(record, null); return; }
             foreach (var template in Attribute.TimeFormats)
             {
                 if (TimeOnly.TryParseExact(data, template, CultureInfo.InvariantCulture, DateTimeStyles.None, out var t))
