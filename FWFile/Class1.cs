@@ -2,6 +2,7 @@
 using System.Globalization;
 using System.Text;
 using System.Threading;
+using System.Runtime.CompilerServices;
 
 namespace fwfile;
 // 1. Specify where the attribute can be used
@@ -275,6 +276,39 @@ public class FWFile<T> where T : new()
             data = reader.ReadLine();
             if (data is null) break; // End of stream
             if (data.Length == 0) continue; // skip empty lines
+            try
+            {
+                e = ParseRow(data);
+            }
+            catch (Exception ex)
+            {
+                throw new FWParseException($"failed parsing line #{index} : '{data}' : {ex.Message}", ex);
+            }
+            yielded++;
+            yield return e;
+        }
+    }
+
+    public async IAsyncEnumerable<T> ParseStreamAsync(Stream stream, Encoding? encoding = null, bool skipHeader = false, int maxRows = 0, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        using var reader = new StreamReader(stream, encoding ?? Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+        var index = 0;
+        if (skipHeader)
+        {
+            await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
+            index = 1;
+        }
+        string? data;
+        var yielded = 0;
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (maxRows > 0 && yielded >= maxRows) break;
+            index++;
+            data = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
+            if (data is null) break;
+            if (data.Length == 0) continue;
+            T e;
             try
             {
                 e = ParseRow(data);
