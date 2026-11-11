@@ -25,9 +25,9 @@ public class FWFieldAttribute : Attribute
         BoolFalseValues = new(falseTokens, StringComparer.InvariantCultureIgnoreCase);
         BoolTrueValueTokens = trueTokens;
         BoolFalseValueTokens = falseTokens;
-        DateTimeFormats = DefaultDateTimeFormat(dateTimeFormat);
-        DateFormats = DefaultDateFormat(dateFormat);
-        TimeFormats = DefaultTimeFormat(timeFormat);
+        DateTimeFormat = dateTimeFormat;
+        DateFormat = dateFormat;
+        TimeFormat = timeFormat;
     }
 
     public int Length { get; private set; }
@@ -40,17 +40,37 @@ public class FWFieldAttribute : Attribute
     public readonly string[] BoolFalseValueTokens;
     public bool Truncate { get; private set; } = true;
 
+    private string _dateTimeFormat = "";
+    private string _dateFormat = "";
+    private string _timeFormat = "";
+
+    public string DateTimeFormat
+    {
+        get => _dateTimeFormat;
+        set { _dateTimeFormat = value; DateTimeFormats = DefaultDateTimeFormat(value); }
+    }
+    public string DateFormat
+    {
+        get => _dateFormat;
+        set { _dateFormat = value; DateFormats = DefaultDateFormat(value); }
+    }
+    public string TimeFormat
+    {
+        get => _timeFormat;
+        set { _timeFormat = value; TimeFormats = DefaultTimeFormat(value); }
+    }
+
     public bool Required { get; set; }
     public string Regex { get; set; } = "";
     public string AllowedValues { get; set; } = "";
     public string Min { get; set; } = "";
     public string Max { get; set; } = "";
 
-    public readonly string[] DateTimeFormats;
+    public string[] DateTimeFormats { get; private set; } = Array.Empty<string>();
 
-    public readonly string[] DateFormats;
+    public string[] DateFormats { get; private set; } = Array.Empty<string>();
 
-    public readonly string[] TimeFormats;
+    public string[] TimeFormats { get; private set; } = Array.Empty<string>();
 
     public bool Trim { get; private set; } = true;
 

@@ -19,10 +19,10 @@ public class FixedWidthBenchmarks
         {
             lines.Append($"{i % 9999 + 1,4}");
             lines.Append("Paciente Teste      ");
-            lines.Append("     10.00");
-            lines.Append("1977-02-05");
+            lines.Append($"{1000,8}");
+            lines.Append("19770205");
             lines.Append("S    ");
-            lines.Append("2001-01-01");
+            lines.Append("20010101  ");
             lines.Append('\n');
         }
         _data = Encoding.UTF8.GetBytes(lines.ToString());
@@ -57,15 +57,15 @@ public class BenchModel
     [FWField(20)]
     public string Name = default!;
 
-    [FWField(10)]
+    [FWField(8, Decimals = 2)]
     public decimal Price;
 
-    [FWField(10, dateTimeFormat: "yyyy-MM-dd")]
+    [FWField(8, Start = 32, DateTimeFormat = "yyyyMMdd")]
     public DateTime Creation;
 
-    [FWField(5)]
+    [FWField(5, Start = 40)]
     public bool Enabled;
 
-    [FWField(10)]
+    [FWField(10, Start = 45, DateTimeFormat = "yyyyMMdd")]
     public DateOnly BirthDay;
 }
