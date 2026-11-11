@@ -1,6 +1,5 @@
 ﻿using System.Reflection;
 using System.Globalization;
-using Microsoft.VisualBasic;
 
 namespace fwfile;
 // 1. Specify where the attribute can be used
