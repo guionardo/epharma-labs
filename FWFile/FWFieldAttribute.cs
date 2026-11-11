@@ -5,10 +5,11 @@ namespace fwfile;
 [AttributeUsage(AttributeTargets.Field, AllowMultiple = false)]
 public class FWFieldAttribute : Attribute
 {
-    public FWFieldAttribute(int length, string header = "", string? boolTrueValues = null, string dateTimeFormat = "", string dateFormat = "", string timeFormat = "")
+    public FWFieldAttribute(int length, string header = "", string? boolTrueValues = null, string dateTimeFormat = "", string dateFormat = "", string timeFormat = "", bool trim = true)
     {
         Length = length;
         Header = header;
+        Trim = trim;
         boolTrueValues ??= "true,1,y,s";
         BoolTrueValues = new(boolTrueValues.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries), StringComparer.InvariantCultureIgnoreCase);
         DateTimeFormats = DefaultDateTimeFormat(dateTimeFormat);
@@ -27,6 +28,8 @@ public class FWFieldAttribute : Attribute
     public readonly string[] DateFormats;
 
     public readonly string[] TimeFormats;
+
+    public bool Trim { get; private set; } = true;
 
     private static string[] DefaultDateTimeFormat(string dateTimeFormat)
     {

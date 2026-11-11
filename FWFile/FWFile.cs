@@ -207,7 +207,7 @@ public class FWFile<T> where T : new()
         {
             var data = row.Substring(index, c.Attribute.Length);
             index += c.Attribute.Length;
-            c.ReadData(data.Trim(), record);
+            c.ReadData(c.Attribute.Trim ? data.Trim() : data, record);
         }
         return record;
     }
