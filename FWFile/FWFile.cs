@@ -15,8 +15,16 @@ public class FWFile<T> where T : new()
 
         internal bool IsNullable;
 
+        internal CultureInfo Culture = CultureInfo.InvariantCulture;
+
+        internal IFWConverter? Converter;
+
         internal delegate void ReadDataDelegate(ReadOnlySpan<char> data, T record);
         internal ReadDataDelegate ReadData = null!;
+
+        internal Type FieldType => Member is FieldInfo fi ? fi.FieldType : ((PropertyInfo)Member).PropertyType;
+
+        internal Type NonNullableType => Nullable.GetUnderlyingType(FieldType) ?? FieldType;
 
         internal void SetMemberValue(T record, object? value)
         {
@@ -29,6 +37,14 @@ public class FWFile<T> where T : new()
             var rawType = Member is FieldInfo fi ? fi.FieldType : ((PropertyInfo)Member).PropertyType;
             var ft = Nullable.GetUnderlyingType(rawType) ?? rawType;
             IsNullable = rawType != ft;
+            Culture = string.IsNullOrWhiteSpace(Attribute.Culture) ? CultureInfo.InvariantCulture : new CultureInfo(Attribute.Culture);
+            if (Attribute.ConverterType is not null)
+            {
+                if (!typeof(IFWConverter).IsAssignableFrom(Attribute.ConverterType)) throw new FWParseException($"Converter type must implement {nameof(IFWConverter)}");
+                Converter = (IFWConverter)Activator.CreateInstance(Attribute.ConverterType)!;
+                ReadData = ReadWithConverter;
+                return this;
+            }
             if (ft == typeof(string))
             {
                 ReadData = ReadString;
@@ -37,21 +53,49 @@ public class FWFile<T> where T : new()
             {
                 ReadData = ReadInt;
             }
+            else if (ft == typeof(long))
+            {
+                ReadData = ReadLong;
+            }
+            else if (ft == typeof(short))
+            {
+                ReadData = ReadShort;
+            }
+            else if (ft == typeof(byte))
+            {
+                ReadData = ReadByte;
+            }
             else if (ft == typeof(float))
             {
                 ReadData = ReadFloat;
             }
-            else if (ft == typeof(bool))
+            else if (ft == typeof(double))
             {
-                ReadData = ReadBool;
+                ReadData = ReadDouble;
             }
             else if (ft == typeof(decimal))
             {
                 ReadData = ReadDecimal;
             }
+            else if (ft == typeof(bool))
+            {
+                ReadData = ReadBool;
+            }
+            else if (ft == typeof(char))
+            {
+                ReadData = ReadChar;
+            }
+            else if (ft == typeof(Guid))
+            {
+                ReadData = ReadGuid;
+            }
             else if (ft == typeof(DateTime))
             {
                 ReadData = ReadDateTime;
+            }
+            else if (ft == typeof(DateTimeOffset))
+            {
+                ReadData = ReadDateTimeOffset;
             }
             else if (ft == typeof(DateOnly))
             {
@@ -61,9 +105,17 @@ public class FWFile<T> where T : new()
             {
                 ReadData = ReadTime;
             }
+            else if (ft == typeof(TimeSpan))
+            {
+                ReadData = ReadTimeSpan;
+            }
+            else if (ft.IsEnum)
+            {
+                ReadData = ReadEnum;
+            }
             else
             {
-                throw new FWParseException($"");
+                throw new FWParseException($"Unsupported field type '{ft.FullName}' for member '{Member.Name}'");
             }
             return this;
         }
@@ -80,7 +132,7 @@ public class FWFile<T> where T : new()
         internal void ReadInt(ReadOnlySpan<char> data, T record)
         {
             if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
-            if (!int.TryParse(data, NumberStyles.Integer, CultureInfo.InvariantCulture, out var i))
+            if (!int.TryParse(data, NumberStyles.Integer, Culture, out var i))
             {
                 throw new FWParseException($"Failed to parse value '{data}' to int field '{Member.Name}");
             }
@@ -89,7 +141,7 @@ public class FWFile<T> where T : new()
         internal void ReadFloat(ReadOnlySpan<char> data, T record)
         {
             if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
-            if (!float.TryParse(data, NumberStyles.Float, CultureInfo.InvariantCulture, out var f))
+            if (!float.TryParse(data, NumberStyles.Float, Culture, out var f))
             {
                 throw new FWParseException($"Failed to parse value '{data}' to float field '{Member.Name}");
             }
@@ -124,7 +176,7 @@ public class FWFile<T> where T : new()
         internal void ReadDecimal(ReadOnlySpan<char> data, T record)
         {
             if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
-            if (!decimal.TryParse(data, NumberStyles.Number, CultureInfo.InvariantCulture, out var d))
+            if (!decimal.TryParse(data, NumberStyles.Number, Culture, out var d))
             {
                 throw new FWParseException($"Failed to parse value '{data}' to Decimal field '{Member.Name}'");
             }
@@ -136,7 +188,7 @@ public class FWFile<T> where T : new()
             if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
             foreach (var template in Attribute.DateTimeFormats)
             {
-                if (DateTime.TryParseExact(data, template, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d))
+                if (DateTime.TryParseExact(data, template, Culture, DateTimeStyles.None, out var d))
                 {
                     SetMemberValue(record, d);
                     return;
@@ -149,7 +201,7 @@ public class FWFile<T> where T : new()
             if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
             foreach (var template in Attribute.DateFormats)
             {
-                if (DateOnly.TryParseExact(data, template, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d))
+                if (DateOnly.TryParseExact(data, template, Culture, DateTimeStyles.None, out var d))
                 {
                     SetMemberValue(record, d);
                     return;
@@ -162,13 +214,83 @@ public class FWFile<T> where T : new()
             if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
             foreach (var template in Attribute.TimeFormats)
             {
-                if (TimeOnly.TryParseExact(data, template, CultureInfo.InvariantCulture, DateTimeStyles.None, out var t))
+                if (TimeOnly.TryParseExact(data, template, Culture, DateTimeStyles.None, out var t))
                 {
                     SetMemberValue(record, t);
                     return;
                 }
             }
             throw new FWParseException($"Failed to parse value '{data}' to TimeOnly field '{Member.Name}");
+        }
+
+        internal void ReadWithConverter(ReadOnlySpan<char> data, T record)
+        {
+            if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
+            var value = Converter!.Read(data, NonNullableType);
+            SetMemberValue(record, value);
+        }
+
+        internal void ReadLong(ReadOnlySpan<char> data, T record)
+        {
+            if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
+            if (!long.TryParse(data, NumberStyles.Integer, Culture, out var v)) throw new FWParseException($"Failed to parse value '{data}' to long field '{Member.Name}'");
+            SetMemberValue(record, v);
+        }
+        internal void ReadShort(ReadOnlySpan<char> data, T record)
+        {
+            if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
+            if (!short.TryParse(data, NumberStyles.Integer, Culture, out var v)) throw new FWParseException($"Failed to parse value '{data}' to short field '{Member.Name}'");
+            SetMemberValue(record, v);
+        }
+        internal void ReadByte(ReadOnlySpan<char> data, T record)
+        {
+            if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
+            if (!byte.TryParse(data, NumberStyles.Integer, Culture, out var v)) throw new FWParseException($"Failed to parse value '{data}' to byte field '{Member.Name}'");
+            SetMemberValue(record, v);
+        }
+        internal void ReadDouble(ReadOnlySpan<char> data, T record)
+        {
+            if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
+            if (!double.TryParse(data, NumberStyles.Float, Culture, out var v)) throw new FWParseException($"Failed to parse value '{data}' to double field '{Member.Name}'");
+            SetMemberValue(record, v);
+        }
+        internal void ReadChar(ReadOnlySpan<char> data, T record)
+        {
+            if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
+            var t = data.Trim();
+            if (t.IsEmpty) { if (IsNullable) { SetMemberValue(record, null); return; } throw new FWParseException($"Failed to parse value '{data}' to char field '{Member.Name}'"); }
+            SetMemberValue(record, t[0]);
+        }
+        internal void ReadGuid(ReadOnlySpan<char> data, T record)
+        {
+            if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
+            if (!Guid.TryParse(data.ToString(), out var v)) throw new FWParseException($"Failed to parse value '{data}' to Guid field '{Member.Name}'");
+            SetMemberValue(record, v);
+        }
+        internal void ReadDateTimeOffset(ReadOnlySpan<char> data, T record)
+        {
+            if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
+            if (!DateTimeOffset.TryParse(data.ToString(), Culture, DateTimeStyles.None, out var v)) throw new FWParseException($"Failed to parse value '{data}' to DateTimeOffset field '{Member.Name}'");
+            SetMemberValue(record, v);
+        }
+        internal void ReadTimeSpan(ReadOnlySpan<char> data, T record)
+        {
+            if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
+            if (!TimeSpan.TryParse(data.ToString(), Culture, out var v)) throw new FWParseException($"Failed to parse value '{data}' to TimeSpan field '{Member.Name}'");
+            SetMemberValue(record, v);
+        }
+        internal void ReadEnum(ReadOnlySpan<char> data, T record)
+        {
+            if (IsNullable && data.Trim().IsEmpty) { SetMemberValue(record, null); return; }
+            try
+            {
+                var v = Enum.Parse(NonNullableType, data.ToString(), ignoreCase: true);
+                SetMemberValue(record, v);
+            }
+            catch (Exception ex)
+            {
+                throw new FWParseException($"Failed to parse value '{data}' to enum field '{Member.Name}'", ex);
+            }
         }
     }
     private List<Column> columns = [];
@@ -234,17 +356,25 @@ public class FWFile<T> where T : new()
         foreach (var c in columns)
         {
             var value = c.Member is FieldInfo fi ? fi.GetValue(record) : ((PropertyInfo)c.Member).GetValue(record);
-            string text = value switch
+            string text;
+            if (c.Converter is not null)
             {
-                null => string.Empty,
-                string s => s,
-                bool b => b ? "true" : "false",
-                DateTime dt => dt.ToString(c.Attribute.DateTimeFormats[0], CultureInfo.InvariantCulture),
-                DateOnly d => d.ToString(c.Attribute.DateFormats[0], CultureInfo.InvariantCulture),
-                TimeOnly t => t.ToString(c.Attribute.TimeFormats[0], CultureInfo.InvariantCulture),
-                IFormattable f => f.ToString(null, CultureInfo.InvariantCulture),
-                _ => value.ToString() ?? string.Empty,
-            };
+                text = c.Converter.Write(value, c.NonNullableType);
+            }
+            else
+            {
+                text = value switch
+                {
+                    null => string.Empty,
+                    string s => s,
+                    bool b => b ? "true" : "false",
+                    DateTime dt => dt.ToString(c.Attribute.DateTimeFormats[0], c.Culture),
+                    DateOnly d => d.ToString(c.Attribute.DateFormats[0], c.Culture),
+                    TimeOnly t => t.ToString(c.Attribute.TimeFormats[0], c.Culture),
+                    IFormattable f => f.ToString(null, c.Culture),
+                    _ => value.ToString() ?? string.Empty,
+                };
+            }
             if (text.Length > c.Attribute.Length) text = text.Substring(0, c.Attribute.Length);
             sb.Append(c.Attribute.RightAlign
                 ? text.PadLeft(c.Attribute.Length, c.Attribute.PadChar)

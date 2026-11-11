@@ -6,7 +6,7 @@ namespace fwfile;
 [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = false)]
 public class FWFieldAttribute : Attribute
 {
-    public FWFieldAttribute(int length, string header = "", string? boolTrueValues = null, string dateTimeFormat = "", string dateFormat = "", string timeFormat = "", bool trim = true, char padChar = ' ', bool rightAlign = false, int order = 0)
+    public FWFieldAttribute(int length, string header = "", string? boolTrueValues = null, string dateTimeFormat = "", string dateFormat = "", string timeFormat = "", bool trim = true, char padChar = ' ', bool rightAlign = false, int order = 0, string culture = "", Type? converterType = null)
     {
         Length = length;
         Header = header;
@@ -14,6 +14,8 @@ public class FWFieldAttribute : Attribute
         PadChar = padChar;
         RightAlign = rightAlign;
         Order = order;
+        Culture = culture;
+        ConverterType = converterType;
         boolTrueValues ??= "true,1,y,s";
         BoolTrueValues = new(boolTrueValues.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries), StringComparer.InvariantCultureIgnoreCase);
         DateTimeFormats = DefaultDateTimeFormat(dateTimeFormat);
@@ -40,6 +42,10 @@ public class FWFieldAttribute : Attribute
     public bool RightAlign { get; private set; }
 
     public int Order { get; private set; }
+
+    public string Culture { get; private set; } = "";
+
+    public Type? ConverterType { get; private set; }
 
     private static string[] DefaultDateTimeFormat(string dateTimeFormat)
     {
