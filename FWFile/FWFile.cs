@@ -237,7 +237,9 @@ public class FWFile<T> where T : new()
                 _ => value.ToString() ?? string.Empty,
             };
             if (text.Length > c.Attribute.Length) text = text.Substring(0, c.Attribute.Length);
-            sb.Append(text.PadRight(c.Attribute.Length));
+            sb.Append(c.Attribute.RightAlign
+                ? text.PadLeft(c.Attribute.Length, c.Attribute.PadChar)
+                : text.PadRight(c.Attribute.Length, c.Attribute.PadChar));
         }
         return sb.ToString();
     }
