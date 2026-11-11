@@ -256,6 +256,50 @@ public class FWFile<T> where T : new()
         return record;
     }
 
+    public string Format(T record)
+    {
+        var sb = new StringBuilder(rowLength);
+        foreach (var c in columns)
+        {
+            var value = c.FieldInfo.GetValue(record);
+            string text = value switch
+            {
+                null => string.Empty,
+                string s => s,
+                bool b => b ? "true" : "false",
+                DateTime dt => dt.ToString(c.Attribute.DateTimeFormats[0], CultureInfo.InvariantCulture),
+                DateOnly d => d.ToString(c.Attribute.DateFormats[0], CultureInfo.InvariantCulture),
+                TimeOnly t => t.ToString(c.Attribute.TimeFormats[0], CultureInfo.InvariantCulture),
+                IFormattable f => f.ToString(null, CultureInfo.InvariantCulture),
+                _ => value.ToString() ?? string.Empty,
+            };
+            if (text.Length > c.Attribute.Length) text = text.Substring(0, c.Attribute.Length);
+            sb.Append(text.PadRight(c.Attribute.Length));
+        }
+        return sb.ToString();
+    }
+
+    public void Write(Stream stream, IEnumerable<T> records, Encoding? encoding = null, bool writeHeader = false)
+    {
+        using var writer = new StreamWriter(stream, encoding ?? Encoding.UTF8, leaveOpen: true);
+        if (writeHeader)
+        {
+            var header = new StringBuilder(rowLength);
+            foreach (var c in columns)
+            {
+                var h = c.Attribute.Header ?? string.Empty;
+                if (h.Length > c.Attribute.Length) h = h.Substring(0, c.Attribute.Length);
+                header.Append(h.PadRight(c.Attribute.Length));
+            }
+            writer.WriteLine(header.ToString());
+        }
+        foreach (var r in records)
+        {
+            writer.WriteLine(Format(r));
+        }
+        writer.Flush();
+    }
+
     public IEnumerable<T> ParseStream(Stream stream, Encoding? encoding = null, bool skipHeader = false, int maxRows = 0, CancellationToken cancellationToken = default)
     {
         using var reader = new StreamReader(stream, encoding ?? Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
