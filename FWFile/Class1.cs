@@ -244,12 +244,12 @@ public class FWFile<T> where T : new()
         if (row.Length != rowLength) throw new FWParseException($"expected row with length {rowLength} but found {row.Length}");
         T record = new();
         var index = 0;
-        columns.ForEach(c =>
+        foreach (var c in columns)
         {
             var data = row.Substring(index, c.Attribute.Length);
             index += c.Attribute.Length;
             c.ReadData(data.Trim(), record);
-        });
+        }
         return record;
     }
 
