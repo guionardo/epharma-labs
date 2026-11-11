@@ -47,6 +47,16 @@ public class FWFieldAttribute : Attribute
 
     public Type? ConverterType { get; private set; }
 
+    private bool _hasDefaultValue;
+    private object? _defaultValue;
+    /// <summary>Valor usado quando a conversão do campo falhar.</summary>
+    public object? DefaultValue
+    {
+        get => _defaultValue;
+        set { _defaultValue = value; _hasDefaultValue = true; }
+    }
+    public bool HasDefaultValue => _hasDefaultValue;
+
     private static string[] DefaultDateTimeFormat(string dateTimeFormat)
     {
         return DefaultFormat(dateTimeFormat, [ "yyyy-MM-dd", "MM/dd/yyyy HH:mm", "dd-MMM-yyyy"]);

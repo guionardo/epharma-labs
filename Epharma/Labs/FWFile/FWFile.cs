@@ -27,6 +27,23 @@ public class FWFile<T> where T : new()
 
         internal Type NonNullableType => Nullable.GetUnderlyingType(FieldType) ?? FieldType;
 
+        internal object? ResolveDefaultValue()
+        {
+            if (!Attribute.HasDefaultValue) throw new InvalidOperationException("No default value defined for this field.");
+            if (Attribute.DefaultValue is null) return null;
+            var underlying = NonNullableType;
+            var v = Attribute.DefaultValue;
+            if (v.GetType() == underlying || underlying.IsAssignableFrom(v.GetType())) return v;
+            try
+            {
+                return Convert.ChangeType(v, underlying, Culture);
+            }
+            catch (Exception ex)
+            {
+                throw new FWParseException($"Failed to convert default value '{v}' to {underlying.Name} for field '{Member.Name}'", ex);
+            }
+        }
+
         internal void SetMemberValue(T record, object? value)
         {
             if (Member is FieldInfo fi) fi.SetValue(record, value);
@@ -388,7 +405,14 @@ public class FWFile<T> where T : new()
             var data = row.AsSpan(index, c.Attribute.Length);
             index += c.Attribute.Length;
             if (c.Attribute.Trim) data = data.Trim();
-            c.ReadData(data, record);
+            try
+            {
+                c.ReadData(data, record);
+            }
+            catch (Exception) when (c.Attribute.HasDefaultValue)
+            {
+                c.SetMemberValue(record, c.ResolveDefaultValue());
+            }
         }
         return record;
     }
