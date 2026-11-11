@@ -4,6 +4,12 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <PackageId>fwfile</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Guionardo Furlan</Authors>
+    <Description>Fixed-width file parser and serializer for .NET.</Description>
+    <RepositoryUrl>https://github.com/guionardo/fwfile</RepositoryUrl>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
 </Project>
