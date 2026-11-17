@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../FWFile/fwfile.csproj" />
+    <ProjectReference Include="../ParentedCollection/ParentedCollection.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,4 +1,10 @@
 <Solution>
+  <Folder Name="/Epharma/" />
+  <Folder Name="/Epharma/Labs/" />
+  <Folder Name="/Epharma/Labs/ParentedCollection/">
+    <Project Path="Epharma/Labs/ParentedCollection.Examples/ParentedCollection.Examples.csproj" />
+    <Project Path="Epharma/Labs/ParentedCollection/ParentedCollection.csproj" />
+  </Folder>
   <Folder Name="/FWFile/" />
   <Project Path="Epharma/Labs/FWFile/fwfile.csproj" />
   <Project Path="Epharma/Labs/Tests/Tests.csproj" />
